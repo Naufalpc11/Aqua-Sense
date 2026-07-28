@@ -1,0 +1,1452 @@
+# Dokumentasi Lengkap Proyek AquaSense
+
+Dokumen ini menjelaskan struktur, arsitektur, aliran data, firmware, logika
+fuzzy, integrasi ThingsBoard, API lokal, dashboard React, konfigurasi, dan
+batasan proyek AquaSense berdasarkan implementasi yang saat ini ada di
+repository.
+
+> Catatan keamanan: nilai SSID, password WiFi, access token device, username,
+> dan password tenant sengaja tidak ditulis di dokumen ini.
+
+## 1. Ringkasan Proyek
+
+AquaSense adalah sistem pemantauan kualitas air asam tambang pasca
+bio-filtrasi. Sistem mengukur tiga parameter:
+
+- pH menggunakan modul PH-4502C.
+- Total Dissolved Solids (TDS) menggunakan TDS Meter V1.0.
+- Turbiditas menggunakan sensor AB147.
+
+ESP32 membaca ketiga sensor, melakukan inferensi fuzzy secara lokal, lalu
+mengirim hasilnya ke ThingsBoard. Dashboard lokal tidak menghitung ulang
+fuzzy. Dashboard hanya membaca dan menampilkan nilai sensor serta hasil fuzzy
+yang sudah dihitung oleh ESP32.
+
+Arsitektur utamanya:
+
+```text
+Sensor
+  |
+  v
+ESP32 -> pembacaan ADC -> konversi sensor -> fuzzy -> JSON telemetry
+  |
+  | HTTP utama, MQTT fallback
+  v
+ThingsBoard
+  |
+  | REST API tenant
+  v
+Node.js API bridge
+  |
+  | /api/telemetry/latest dan /api/telemetry/history
+  v
+React dashboard
+```
+
+## 2. Tujuan Setiap Lapisan
+
+| Lapisan | Tanggung jawab |
+| --- | --- |
+| Sensor | Menghasilkan sinyal analog pH, TDS, dan turbiditas |
+| ESP32 | Sampling ADC, kalibrasi, fuzzy, serial debug, pengiriman telemetry |
+| ThingsBoard | Menyimpan latest telemetry dan histori time-series |
+| Node API | Login tenant, mengambil telemetry, normalisasi data, cache, dan static hosting |
+| React | Menampilkan status, gauge, grafik, visualisasi air, dan log |
+
+Pemisahan ini penting karena:
+
+- Keputusan kualitas air tetap dibuat oleh perangkat melalui fuzzy.
+- ThingsBoard menjadi penyimpanan dan sumber histori.
+- Credential tenant tidak dikirim ke browser.
+- Dashboard dapat tetap menampilkan data terakhir walaupun ESP32 baru dicabut.
+
+## 3. Tech Stack
+
+### 3.1 Embedded dan perangkat keras
+
+| Teknologi | Pemakaian |
+| --- | --- |
+| ESP32 Dev Kit V4 | Mikrokontroler dan koneksi WiFi |
+| Arduino framework | Runtime firmware |
+| PlatformIO | Build, upload, dependency, dan serial monitor |
+| PH-4502C | Sensor pH pada GPIO34 |
+| TDS Meter V1.0 | Sensor TDS pada GPIO35 |
+| Turbidity AB147 | Sensor turbiditas pada GPIO32 |
+| ADC ESP32 | Resolusi 12-bit, atenuasi 11 dB |
+
+### 3.2 Library firmware
+
+| Library | Fungsi |
+| --- | --- |
+| `WiFi.h` | Koneksi ESP32 ke WiFi |
+| `HTTPClient.h` | Pengiriman telemetry HTTP ke ThingsBoard |
+| `PubSubClient` 2.8+ | MQTT fallback |
+| `ArduinoJson` 6.21.5+ | Penyusunan payload JSON |
+
+`WiFi.h` dan `HTTPClient.h` berasal dari Arduino core ESP32. `PubSubClient`
+dan `ArduinoJson` dikelola oleh PlatformIO melalui `platformio.ini`.
+
+### 3.3 Backend dan frontend
+
+| Teknologi | Versi proyek | Fungsi |
+| --- | --- | --- |
+| Node.js | Direkomendasikan 22+ | API bridge dan static server |
+| React | `^19.2.6` | UI dashboard |
+| React DOM | `^19.2.6` | Render React ke browser |
+| Recharts | `^3.8.1` | Grafik time-series |
+| Vite | `^8.0.12` | Dev server dan build frontend |
+| ESLint | `^10.3.0` | Pemeriksaan kode JavaScript/JSX |
+
+Backend hanya memakai modul bawaan Node.js dan global `fetch`. Tidak ada
+framework Express.
+
+## 4. Struktur Folder
+
+```text
+aquasense/
+|-- .env
+|-- .env.example
+|-- .gitignore
+|-- .pio/
+|-- .vscode/
+|-- dist/
+|-- docs/
+|   |-- PROJECT_DOCUMENTATION.md
+|   `-- THINGSBOARD_SETUP.md
+|-- firmware/
+|   `-- main.cpp
+|-- node_modules/
+|-- public/
+|   |-- favicon.svg
+|   `-- icons.svg
+|-- server/
+|   |-- config.js
+|   |-- http-utils.js
+|   |-- index.js
+|   |-- telemetry-service.js
+|   `-- thingsboard-client.js
+|-- src/
+|   |-- assets/
+|   |   |-- hero.png
+|   |   |-- react.svg
+|   |   `-- vite.svg
+|   |-- components/
+|   |   |-- ui/
+|   |   |   `-- Widgets.jsx
+|   |   `-- AquaSense.jsx
+|   |-- hooks/
+|   |   `-- useTelemetry.js
+|   |-- styles/
+|   |   `-- AquaSense.css
+|   |-- utils/
+|   |   `-- theme.js
+|   |-- App.css
+|   |-- App.jsx
+|   |-- index.css
+|   |-- main.jsx
+|   `-- monitor_air_asam_tambang.ino
+|-- eslint.config.js
+|-- index.html
+|-- package-lock.json
+|-- package.json
+|-- platformio.ini
+|-- README.md
+`-- vite.config.js
+```
+
+### 4.1 Folder sumber utama
+
+| Folder | Isi |
+| --- | --- |
+| `firmware/` | Entry point yang dikenali PlatformIO |
+| `src/` | Firmware asli dan source code dashboard React |
+| `server/` | API lokal yang menghubungkan dashboard ke ThingsBoard |
+| `public/` | File statis yang disalin Vite tanpa pemrosesan |
+| `docs/` | Dokumentasi proyek dan panduan ThingsBoard |
+
+### 4.2 Folder hasil generate
+
+| Folder | Dibuat oleh | Keterangan |
+| --- | --- | --- |
+| `.pio/` | PlatformIO | Object, library, dan hasil build firmware |
+| `node_modules/` | npm | Dependency JavaScript lokal |
+| `dist/` | Vite | Hasil build frontend untuk mode produksi |
+| `.vscode/` | VS Code/PlatformIO | Konfigurasi editor dan extension |
+
+Folder generate tidak berisi logika bisnis utama dan umumnya tidak perlu
+diedit manual.
+
+## 5. Penjelasan Setiap File
+
+### 5.1 File firmware
+
+#### `src/monitor_air_asam_tambang.ino`
+
+Ini adalah sumber utama firmware dan pusat logika sistem. Isinya:
+
+- Konfigurasi WiFi dan ThingsBoard.
+- Penentuan pin sensor.
+- Konfigurasi dan kalibrasi ADC.
+- Pembacaan pH, TDS, dan turbiditas.
+- Fungsi keanggotaan fuzzy.
+- 33 pemanggilan aturan fuzzy.
+- Defuzzifikasi dan klasifikasi kualitas air.
+- Penyusunan payload JSON.
+- Pengiriman HTTP dengan MQTT fallback.
+- Output diagnostik ke Serial Monitor.
+- Fungsi Arduino `setup()` dan `loop()`.
+
+File inilah yang menentukan nilai fuzzy. Backend dan frontend tidak
+mengubah hasil tersebut.
+
+#### `firmware/main.cpp`
+
+PlatformIO dikonfigurasi memakai `firmware/` sebagai source directory.
+`main.cpp` menyediakan entry point C++ yang mengimpor library Arduino lalu
+menyertakan firmware asli:
+
+```cpp
+#include "../src/monitor_air_asam_tambang.ino"
+```
+
+Dengan pola ini:
+
+- File `.ino` tetap menjadi sumber logika tunggal.
+- Tidak perlu menduplikasi atau memindahkan isi firmware.
+- PlatformIO dapat mengompilasi firmware melalui `main.cpp`.
+
+### 5.2 File backend
+
+#### `server/index.js`
+
+Entry point backend yang sekarang hanya menangani:
+
+1. Membuat HTTP server.
+2. Mendefinisikan route API.
+3. Meneruskan pekerjaan ke service terkait.
+4. Mengubah error menjadi respons `503`.
+5. Menjalankan server pada port yang dikonfigurasi.
+
+Endpoint yang tersedia:
+
+| Method | Endpoint | Fungsi |
+| --- | --- | --- |
+| `GET` | `/api/health` | Memeriksa server dan kelengkapan konfigurasi |
+| `GET` | `/api/telemetry/latest` | Mengambil telemetry terbaru |
+| `GET` | `/api/telemetry/history` | Mengambil histori time-series |
+
+#### `server/config.js`
+
+Memuat `.env`, menyusun konfigurasi aplikasi, memvalidasi credential
+ThingsBoard, dan menyediakan pemeriksaan status konfigurasi untuk endpoint
+health.
+
+#### `server/thingsboard-client.js`
+
+Menangani komunikasi tingkat rendah dengan ThingsBoard:
+
+- Login akun tenant.
+- Menyimpan dan memperbarui JWT.
+- Mengulang request sekali ketika menerima `401`.
+- Menentukan device berdasarkan ID atau nama.
+
+#### `server/telemetry-service.js`
+
+Menangani logika data telemetry:
+
+- Daftar key latest dan history.
+- Normalisasi number, boolean, dan status.
+- Pengambilan latest telemetry.
+- Pengambilan dan penggabungan histori.
+- Dedup burst telemetry.
+- Cache latest 500 ms dan history 5 detik.
+
+#### `server/http-utils.js`
+
+Berisi helper respons JSON dan penyajian file statis dari folder `dist/`.
+
+### 5.3 File frontend
+
+#### `src/main.jsx`
+
+Entry point React:
+
+1. Mengimpor global CSS.
+2. Mencari elemen HTML `#root`.
+3. Merender `<App />` melalui `createRoot`.
+4. Membungkus aplikasi dengan `StrictMode`.
+
+#### `src/App.jsx`
+
+Komponen root yang hanya merender komponen utama:
+
+```jsx
+<AquaSense />
+```
+
+#### `src/components/AquaSense.jsx`
+
+Komponen dashboard utama. Tanggung jawabnya:
+
+- Memanggil hook `useTelemetry()`.
+- Menampilkan status koneksi.
+- Menampilkan status kualitas air dan rekomendasi.
+- Menampilkan gauge pH, TDS, NTU, dan fuzzy score.
+- Menampilkan grafik Recharts.
+- Menampilkan visualisasi sampel air.
+- Menampilkan diagram proses bio-filtrasi.
+- Menampilkan delapan log sensor terbaru.
+- Menampilkan jam browser dan uptime halaman.
+
+`uptime` pada header adalah lama halaman dashboard dibuka, bukan uptime
+ESP32.
+
+#### `src/components/ui/Widgets.jsx`
+
+Berisi komponen UI reusable:
+
+| Komponen | Fungsi |
+| --- | --- |
+| `ArcGauge` | Gauge SVG untuk pH, TDS, dan NTU |
+| `ScoreRing` | Gauge lingkaran fuzzy score |
+| `WaterSample` | Visualisasi warna dan partikel sampel air |
+| `ParamBar` | Progress bar dan status per parameter |
+| `FlowDiagram` | Diagram proses bio-filtrasi sampai monitoring |
+| `ChartTip` | Tooltip custom untuk grafik |
+
+Semua komponen gauge dibuat menggunakan SVG dan tidak memerlukan library
+gauge tambahan.
+
+#### `src/hooks/useTelemetry.js`
+
+Hook ini mengelola seluruh pengambilan data browser:
+
+- Memuat histori ketika halaman pertama dibuka.
+- Melakukan polling latest telemetry.
+- Menyimpan nilai terbaru, grafik, log, dan status koneksi.
+- Mencegah request polling tumpang tindih.
+- Membatasi histori tampilan menjadi 55 titik.
+- Membatasi log tabel menjadi 8 baris.
+- Mengurangi polling ketika tab browser tidak aktif.
+- Membatalkan request saat komponen dilepas.
+
+Konstanta utamanya:
+
+```text
+POLL_MS            = 1000 ms
+HIDDEN_POLL_MS     = 10000 ms
+REQUEST_TIMEOUT_MS = 8000 ms
+```
+
+#### `src/utils/theme.js`
+
+Menyimpan palet warna global:
+
+- Cyan untuk aksen.
+- Biru untuk pH.
+- Hijau untuk TDS.
+- Kuning untuk NTU.
+- Ungu untuk fuzzy.
+- Hijau, kuning, dan merah untuk status.
+
+#### `src/index.css`
+
+File ini diimpor oleh `src/main.jsx`, tetapi saat ini kosong.
+
+#### `src/styles/AquaSense.css`
+
+File style aktif yang diimpor oleh `AquaSense.jsx`. Isinya:
+
+- Import Google Fonts `Chakra Petch` dan `IBM Plex Mono`.
+- Reset margin dan `box-sizing`.
+- Scrollbar custom.
+- Animasi pulse, float, row baru, dan glow.
+- Style dasar kartu dan hover tabel.
+- Class `.card`, `.pls`, `.flt`, `.trh`, dan `.nw-anim`.
+
+#### `src/App.css`
+
+File template yang saat ini kosong dan tidak diimpor oleh aplikasi.
+
+### 5.4 File konfigurasi
+
+#### `platformio.ini`
+
+Konfigurasi build firmware:
+
+```ini
+[platformio]
+src_dir = firmware
+
+[env:esp32dev]
+platform = espressif32
+board = esp32dev
+framework = arduino
+monitor_speed = 115200
+upload_port = COM3
+monitor_port = COM3
+upload_speed = 115200
+```
+
+Implikasinya:
+
+- Environment PlatformIO bernama `esp32dev`.
+- Board profile menggunakan ESP32 Dev Module.
+- Upload dan monitor saat ini dikunci ke `COM3`.
+- Serial Monitor memakai 115200 baud.
+
+Jika nomor COM berubah setelah perangkat dicabut dan dipasang ulang, nilai
+`upload_port` dan `monitor_port` harus disesuaikan.
+
+#### `package.json`
+
+Mendefinisikan dependency dan script npm:
+
+| Script | Perintah | Fungsi |
+| --- | --- | --- |
+| `npm run dev` | `vite` | Menjalankan frontend development |
+| `npm run server` | `node server/index.js` | Menjalankan API sekali |
+| `npm run server:dev` | `node --watch server/index.js` | API dengan auto-restart |
+| `npm start` | `node server/index.js` | Menjalankan mode produksi |
+| `npm run build` | `vite build` | Membuat folder `dist/` |
+| `npm run lint` | `eslint .` | Memeriksa JavaScript dan JSX |
+| `npm run preview` | `vite preview` | Preview hasil build Vite |
+
+#### `package-lock.json`
+
+Mengunci versi dependency npm beserta dependency turunannya agar instalasi
+lebih konsisten antar komputer.
+
+#### `vite.config.js`
+
+Mengaktifkan plugin React dan proxy development:
+
+```text
+/api/* -> http://localhost:3001
+```
+
+Browser mengakses API melalui origin Vite, lalu Vite meneruskannya ke Node.
+Ini menghindari kebutuhan konfigurasi CORS pada development lokal.
+
+#### `eslint.config.js`
+
+Mengaktifkan:
+
+- Rule JavaScript yang direkomendasikan.
+- Rule React Hooks.
+- Rule React Refresh untuk Vite.
+- Global browser untuk frontend.
+- Global Node untuk file di `server/`.
+- Pengabaian folder `dist/`.
+
+#### `.env.example`
+
+Template konfigurasi Node API. Variabelnya:
+
+| Variabel | Fungsi |
+| --- | --- |
+| `TB_BASE_URL` | Origin ThingsBoard yang dapat diakses server |
+| `TB_USERNAME` | Username akun tenant |
+| `TB_PASSWORD` | Password akun tenant |
+| `TB_DEVICE_ID` | UUID device, pilihan utama |
+| `TB_DEVICE_NAME` | Fallback pencarian device berdasarkan nama |
+| `API_PORT` | Port Node API, default 3001 |
+| `TB_STALE_AFTER_MS` | Batas umur data sebelum device dianggap stale |
+
+`TB_BASE_URL` harus berisi origin lengkap yang benar, termasuk port apabila
+ThingsBoard tidak berjalan pada port default.
+
+#### `.env`
+
+Berisi nilai konfigurasi asli yang dipakai server lokal. File ini diabaikan
+Git dan tidak boleh dibagikan karena berisi credential tenant.
+
+#### `.gitignore`
+
+Mengabaikan file hasil generate dan rahasia seperti:
+
+- `node_modules`
+- `dist`
+- `.env`
+- `.pio`
+- log
+- sebagian konfigurasi editor
+
+### 5.5 File HTML, public, dan aset
+
+#### `index.html`
+
+Shell HTML Vite yang:
+
+- Menentukan favicon.
+- Menyediakan elemen `<div id="root">`.
+- Memuat `/src/main.jsx`.
+
+#### `public/favicon.svg`
+
+Favicon browser yang saat ini berasal dari aset default/template.
+
+#### `public/icons.svg`
+
+Sprite SVG berisi beberapa ikon sosial dan dokumentasi. File ini belum
+dipakai oleh dashboard saat ini.
+
+#### `src/assets/hero.png`
+
+Aset gambar yang belum diimpor oleh komponen aktif.
+
+#### `src/assets/react.svg` dan `src/assets/vite.svg`
+
+Aset bawaan template React/Vite yang tidak digunakan oleh dashboard aktif.
+
+### 5.6 File dokumentasi
+
+#### `README.md`
+
+Panduan operasional singkat:
+
+- Menyiapkan firmware.
+- Build dan upload ESP32.
+- Membuka Serial Monitor.
+- Menjalankan backend dan frontend.
+- Menjalankan mode produksi.
+- Memeriksa interval dan grafik.
+
+#### `docs/THINGSBOARD_SETUP.md`
+
+Panduan khusus konfigurasi ThingsBoard, device, telemetry, dan dashboard
+ThingsBoard.
+
+#### `docs/PROJECT_DOCUMENTATION.md`
+
+Dokumen arsitektur dan penjelasan source code yang sedang dibaca ini.
+
+## 6. Konfigurasi Hardware dan ADC
+
+### 6.1 Pin sensor
+
+| Sensor | Pin ESP32 | Kanal | Catatan |
+| --- | --- | --- | --- |
+| pH | GPIO34 | ADC1_CH6 | Input-only |
+| TDS | GPIO35 | ADC1_CH7 | Input-only |
+| Turbiditas | GPIO32 | ADC1_CH4 | ADC1 |
+
+Semua sensor memakai ADC1 agar tetap dapat dibaca ketika WiFi ESP32 aktif.
+Pada ESP32, ADC2 dapat konflik dengan WiFi.
+
+### 6.2 Parameter ADC
+
+```text
+ADC_BITS = 12
+ADC_MAX  = 4095
+ADC_VREF = 3.3 V
+```
+
+Konversi raw ADC menjadi tegangan:
+
+```text
+voltage = raw / 4095 * 3.3
+```
+
+Firmware juga menjalankan:
+
+```cpp
+analogReadResolution(12);
+analogSetAttenuation(ADC_11db);
+```
+
+### 6.3 Sampling
+
+Setiap pemanggilan `adcAvg(pin)`:
+
+1. Membaca ADC sebanyak 30 kali.
+2. Memberi delay 10 ms di setiap pembacaan.
+3. Menjumlahkan seluruh raw ADC.
+4. Mengembalikan rata-rata.
+
+Perkiraan minimum waktu satu batch:
+
+```text
+30 sampel x 10 ms = 300 ms
+```
+
+Dalam loop normal ada tiga batch:
+
+```text
+turbiditas + pH + TDS = sekitar 900 ms
+```
+
+Nilai turbiditas di loop hanya disampling satu kali lalu hasil tegangan yang
+sama dipakai untuk debug dan telemetry.
+
+## 7. Konversi Nilai Sensor
+
+### 7.1 pH
+
+Konstanta saat ini:
+
+```text
+PH_VOLT_AT7 = 2.42 V
+PH_SLOPE    = 0.0592 V/pH
+PH_OFFSET   = -3.0
+```
+
+Rumus:
+
+```text
+pH = 7 + (PH_VOLT_AT7 - voltage) / PH_SLOPE + PH_OFFSET
+```
+
+Hasil dibatasi ke rentang `0 sampai 14`.
+
+`readPH()` juga mencetak raw ADC dan tegangan agar kalibrasi dapat diperiksa
+melalui Serial Monitor.
+
+### 7.2 TDS
+
+Konstanta:
+
+```text
+TDS_K    = 0.5
+TDS_TEMP = 25 C
+```
+
+Kompensasi tegangan suhu:
+
+```text
+vc = voltage / (1 + 0.02 * (temperature - 25))
+```
+
+Konversi TDS:
+
+```text
+TDS = (133.42 * vc^3 - 255.86 * vc^2 + 857.39 * vc) * TDS_K
+```
+
+Hasil dibatasi ke `0 sampai 5000 ppm`.
+
+Karena `TDS_TEMP` tetap 25 C dan tidak ada sensor suhu, kompensasi saat ini
+bersifat konstan.
+
+### 7.3 Turbiditas
+
+Konstanta implementasi:
+
+```text
+TURB_V_CLEAR  = 1.67 V
+TURB_V_TURBID = 1.49 V
+```
+
+`turbidityFromVoltage()` memetakan:
+
+```text
+1.67 V -> 0 NTU
+1.49 V -> 1000 NTU
+```
+
+Nilai di antaranya dipetakan linear menggunakan fungsi Arduino `map()`, lalu
+dibatasi ke `0 sampai 1000 NTU`.
+
+Konsekuensinya:
+
+- Tegangan sama atau lebih tinggi dari batas jernih cenderung menjadi 0 NTU.
+- Tegangan sama atau lebih rendah dari batas keruh cenderung menjadi 1000 NTU.
+- Perubahan kecil pada tegangan dapat menghasilkan perubahan NTU besar karena
+  rentang kalibrasinya hanya 0.18 V.
+
+Komentar lama di firmware masih membahas rasio voltage divider dan contoh
+4.2 V, tetapi implementasi aktif langsung menggunakan tegangan ADC dengan
+batas `1.67 V` dan `1.49 V`.
+
+## 8. Logika Fuzzy
+
+### 8.1 Posisi fuzzy dalam sistem
+
+Fuzzy dijalankan setelah tiga nilai sensor selesai dihitung:
+
+```text
+pH + TDS + NTU -> fuzzifikasi -> evaluasi rule -> weighted average
+                -> score 0-100 -> status dan rekomendasi
+```
+
+Dashboard tidak mengulang proses tersebut.
+
+### 8.2 Fungsi keanggotaan
+
+Semua himpunan menggunakan fungsi trapesium:
+
+```text
+mfTrap(x, a, b, c, d)
+```
+
+Perilakunya:
+
+- `0` jika `x < a` atau `x > d`.
+- `1` jika `b <= x <= c`.
+- Naik linear dari `a` ke `b`.
+- Turun linear dari `c` ke `d`.
+- Mendukung bahu kiri ketika `a = b`.
+- Mendukung bahu kanan ketika `c = d`.
+
+### 8.3 Himpunan pH
+
+| Kode | Nama | Parameter trapesium |
+| --- | --- | --- |
+| `pSA` | Sangat Asam | `[0, 0, 3, 5]` |
+| `pA` | Asam | `[3, 4.5, 6, 7]` |
+| `pN` | Netral | `[5.5, 6.5, 7.5, 9]` |
+| `pB` | Basa | `[7.5, 9, 14, 14]` |
+
+Rentang saling tumpang tindih. Satu nilai pH dapat memiliki derajat
+keanggotaan pada lebih dari satu kategori.
+
+### 8.4 Himpunan TDS
+
+| Kode | Nama | Parameter trapesium, ppm |
+| --- | --- | --- |
+| `tL` | Rendah | `[0, 0, 200, 500]` |
+| `tM` | Sedang | `[150, 400, 600, 1000]` |
+| `tH` | Tinggi | `[600, 900, 1400, 2000]` |
+| `tVH` | Sangat Tinggi | `[1400, 2000, 5000, 5000]` |
+
+### 8.5 Himpunan turbiditas
+
+| Kode | Nama | Parameter trapesium, NTU |
+| --- | --- | --- |
+| `nJ` | Jernih | `[0, 0, 5, 30]` |
+| `nAK` | Agak Keruh | `[5, 20, 60, 100]` |
+| `nK` | Keruh | `[50, 100, 250, 500]` |
+| `nSK` | Sangat Keruh | `[300, 600, 3000, 3000]` |
+
+Walaupun konversi sensor dibatasi maksimal 1000 NTU, himpunan `nSK`
+didefinisikan sampai 3000 NTU. Pada input perangkat saat ini, bagian di atas
+1000 tidak pernah tercapai.
+
+### 8.6 Operator fuzzy
+
+Operator AND menggunakan nilai minimum:
+
+```text
+strength = min(muA, muB, muC)
+```
+
+Macro `R(strength, output)` mengakumulasi:
+
+```text
+ws += strength * output
+wt += strength
+```
+
+### 8.7 Daftar 33 aturan
+
+Implementasi aktual memiliki 33 pemanggilan aturan. Beberapa banner dan
+komentar lama di file `.ino` masih menulis 30 rules.
+
+#### Kelompok 1: Layak, 4 aturan
+
+| No. | Kondisi | Singleton |
+| --- | --- | ---: |
+| 1 | Netral AND TDS rendah AND jernih | 95 |
+| 2 | Netral AND TDS rendah AND agak keruh | 85 |
+| 3 | Netral AND TDS sedang AND jernih | 80 |
+| 4 | Netral AND TDS sedang AND agak keruh | 72 |
+
+#### Kelompok 2: Perlu treatment kondisi umum, 9 aturan
+
+| No. | Kondisi | Singleton |
+| --- | --- | ---: |
+| 5 | Netral AND TDS tinggi AND jernih | 65 |
+| 6 | Netral AND TDS sedang AND keruh | 60 |
+| 7 | Netral AND TDS rendah AND keruh | 58 |
+| 8 | Asam AND TDS rendah AND jernih | 58 |
+| 9 | Netral AND TDS tinggi AND agak keruh | 55 |
+| 10 | Asam AND TDS sedang AND jernih | 52 |
+| 11 | Netral AND keruh | 55 |
+| 12 | Asam AND TDS rendah AND agak keruh | 50 |
+| 13 | Netral AND sangat keruh | 45 |
+
+#### Kelompok 3: Perlu treatment air basa, 9 aturan
+
+| No. | Kondisi | Singleton |
+| --- | --- | ---: |
+| 14 | Basa | 60 |
+| 15 | Basa AND TDS sedang | 57 |
+| 16 | Basa AND TDS tinggi | 53 |
+| 17 | Basa AND TDS sangat tinggi | 48 |
+| 18 | Basa AND agak keruh | 58 |
+| 19 | Basa AND keruh | 54 |
+| 20 | Basa AND sangat keruh | 47 |
+| 21 | Basa AND TDS tinggi AND keruh | 51 |
+| 22 | Basa AND TDS sangat tinggi AND sangat keruh | 44 |
+
+#### Kelompok 4: Tidak layak, 11 aturan
+
+| No. | Kondisi | Singleton |
+| --- | --- | ---: |
+| 23 | Sangat asam | 15 |
+| 24 | Sangat asam AND TDS rendah | 20 |
+| 25 | Sangat asam AND agak keruh | 16 |
+| 26 | Sangat asam AND keruh | 14 |
+| 27 | Sangat asam AND sangat keruh | 10 |
+| 28 | Sangat asam AND TDS rendah AND agak keruh | 17 |
+| 29 | Sangat asam AND TDS rendah AND keruh | 14 |
+| 30 | Sangat asam AND TDS rendah AND sangat keruh | 10 |
+| 31 | Asam AND TDS tinggi AND sangat keruh | 22 |
+| 32 | Asam AND TDS sangat tinggi AND jernih | 32 |
+| 33 | Netral AND TDS sangat tinggi AND sangat keruh | 28 |
+
+### 8.8 Defuzzifikasi
+
+Skor akhir:
+
+```text
+score = sum(strength * singleton) / sum(strength)
+```
+
+Jika tidak ada aturan aktif:
+
+```text
+score = 50
+```
+
+Skor kemudian dibatasi ke `0 sampai 100`.
+
+Firmware menyebut pendekatan ini "Mamdani + Weighted Average". Secara teknis,
+konsekuen setiap aturan pada kode adalah nilai singleton dan hasil akhirnya
+weighted average, bukan centroid dari kurva output Mamdani kontinu. Dokumen
+ini mengikuti perilaku implementasi aktual.
+
+### 8.9 Klasifikasi output
+
+| Score | Level | Label | Rekomendasi |
+| --- | ---: | --- | --- |
+| `>= 70` | 2 | `LAYAK` | Air layak digunakan |
+| `>= 40` dan `< 70` | 1 | `PERLU_TREATMENT` | Netralisasi/filtrasi sebelum digunakan |
+| `< 40` | 0 | `TIDAK_LAYAK` | Pengolahan intensif diperlukan |
+
+Karena beberapa aturan dapat aktif bersamaan, score akhir dapat berbeda dari
+nilai singleton salah satu aturan. Nilainya merupakan rata-rata berbobot dari
+semua aturan aktif.
+
+## 9. Alur Firmware
+
+### 9.1 Alur `setup()`
+
+```mermaid
+flowchart TD
+    A[ESP32 boot] --> B[Serial 115200]
+    B --> C[Konfigurasi ADC 12-bit dan 11 dB]
+    C --> D[Tunggu sensor 3 detik]
+    D --> E[Hubungkan WiFi]
+    E -->|gagal setelah 40 x 500 ms| F[ESP.restart]
+    E -->|berhasil| G[Konfigurasi client MQTT]
+    G --> H[Baca 3 sensor untuk diagnostik]
+    H --> I[Jalankan fuzzy diagnostik]
+    I --> J[Monitoring siap]
+```
+
+`connectWiFi()` mencoba maksimal sekitar 20 detik. Jika tetap gagal,
+perangkat restart.
+
+### 9.2 Alur `loop()`
+
+```mermaid
+flowchart TD
+    A[loop] --> B{Sudah 2000 ms?}
+    B -->|belum| A
+    B -->|sudah| C[Simpan lastSent]
+    C --> D[Sampling turbiditas]
+    D --> E[Sampling pH]
+    E --> F[Sampling TDS]
+    F --> G[Konversi ke pH, ppm, NTU]
+    G --> H[Hitung membership]
+    H --> I[Evaluasi 33 aturan]
+    I --> J[Defuzzifikasi dan status]
+    J --> K[Cetak diagnostik serial]
+    K --> L[Buat JSON telemetry]
+    L --> M[POST HTTP ThingsBoard]
+    M -->|gagal| N[Coba MQTT fallback]
+    M -->|berhasil| A
+    N --> A
+```
+
+`lastSent` dicatat sebelum proses sampling. Karena sampling sekitar 900 ms,
+interval awal siklus tetap ditargetkan setiap 2 detik selama pengiriman tidak
+memblokir terlalu lama.
+
+### 9.3 Pengiriman HTTP dan fallback MQTT
+
+URL HTTP:
+
+```text
+http://TB_HOST:TB_HTTP_PORT/api/v1/TB_TOKEN/telemetry
+```
+
+Konfigurasi timeout:
+
+```text
+HTTP connect timeout = 1000 ms
+HTTP total timeout   = 1500 ms
+MQTT socket timeout  = 1 detik
+```
+
+Urutannya:
+
+1. Firmware mencoba HTTP POST.
+2. Status HTTP `200 sampai 299` dianggap berhasil.
+3. Jika HTTP gagal, firmware mencoba satu koneksi MQTT singkat.
+4. Jika MQTT tersambung, payload dipublish ke
+   `v1/devices/me/telemetry`.
+5. Hasil dan payload dicetak ke Serial Monitor.
+
+Fungsi `connectMQTT()` yang melakukan beberapa retry masih tersedia, tetapi
+tidak dipanggil pada alur normal. Fallback memakai koneksi MQTT langsung satu
+kali agar loop tidak tertahan lama.
+
+## 10. Kontrak Telemetry
+
+ESP32 mengirim key berikut:
+
+| Key ThingsBoard | Tipe | Sumber |
+| --- | --- | --- |
+| `ph` | number | Hasil pembacaan pH, 2 desimal |
+| `tds_ppm` | number | Hasil TDS, 1 desimal |
+| `turbidity_ntu` | number | Hasil turbiditas, 1 desimal |
+| `fuzzy_score` | number | Score fuzzy, 1 desimal |
+| `water_status` | string | `LAYAK`, `PERLU_TREATMENT`, atau `TIDAK_LAYAK` |
+| `water_level` | number | 2, 1, atau 0 |
+| `rekomendasi` | string | Tindakan berdasarkan fuzzy |
+| `is_usable` | number | 1 jika level 2 |
+| `need_treatment` | number | 1 jika level 1 |
+| `not_usable` | number | 1 jika level 0 |
+| `ph_ok` | number | 1 jika pH 6.5 sampai 8.5 |
+| `tds_ok` | number | 1 jika TDS di bawah 500 ppm |
+| `turb_ok` | number | 1 jika NTU di bawah 5 |
+| `ph_kategori` | string | Kategori pH untuk dashboard |
+
+Kategori `ph_kategori`:
+
+| Kondisi | Nilai |
+| --- | --- |
+| pH `< 5.0` | `SANGAT_ASAM` |
+| pH `< 6.5` | `ASAM` |
+| pH `<= 8.5` | `NETRAL` |
+| pH `<= 9.5` | `BASA_RINGAN` |
+| Selain itu | `SANGAT_BASA` |
+
+Flag `ph_ok`, `tds_ok`, dan `turb_ok` adalah pemeriksaan ambang individual.
+Status fuzzy tetap ditentukan oleh score hasil kombinasi aturan.
+
+Contoh bentuk payload tanpa credential:
+
+```json
+{
+  "ph": 6.93,
+  "tds_ppm": 53.0,
+  "turbidity_ntu": 3.0,
+  "fuzzy_score": 95.0,
+  "water_status": "LAYAK",
+  "water_level": 2,
+  "rekomendasi": "Air layak digunakan",
+  "is_usable": 1,
+  "need_treatment": 0,
+  "not_usable": 0,
+  "ph_ok": 1,
+  "tds_ok": 1,
+  "turb_ok": 1,
+  "ph_kategori": "NETRAL"
+}
+```
+
+## 11. Alur Node API
+
+### 11.1 Memuat environment
+
+`loadEnvFile('.env')` membaca file secara manual:
+
+- Baris kosong dan komentar dilewati.
+- Key dan value dipisahkan pada tanda `=`.
+- Quote pembungkus dihapus.
+- Environment yang sudah ada tidak ditimpa.
+
+### 11.2 Autentikasi ThingsBoard
+
+Server login ke:
+
+```text
+POST /api/auth/login
+```
+
+Body berisi username dan password tenant. JWT disimpan di memori proses.
+Jika request mendapat `401`, JWT dibuang, login diulang satu kali, lalu
+request dicoba kembali.
+
+### 11.3 Resolusi device
+
+Urutan pencarian:
+
+1. Gunakan `TB_DEVICE_ID` jika tersedia.
+2. Jika kosong, cari device berdasarkan `TB_DEVICE_NAME`.
+3. Simpan ID yang sudah ditemukan dalam memori agar tidak dicari berulang.
+
+UUID device lebih disarankan karena tidak berubah ketika nama device diedit.
+
+### 11.4 Latest telemetry
+
+Endpoint internal ThingsBoard yang dipakai:
+
+```text
+/api/plugins/telemetry/DEVICE/{deviceId}/values/timeseries?keys=...
+```
+
+Server:
+
+1. Mengambil seluruh key telemetry terbaru.
+2. Mencari timestamp terbesar.
+3. Mengubah string ThingsBoard menjadi number/boolean.
+4. Mengubah label firmware menjadi label UI.
+5. Menghitung apakah device masih online.
+6. Menyimpan hasil dalam cache selama 500 ms.
+
+Penentuan online:
+
+```text
+Date.now() - timestamp <= TB_STALE_AFTER_MS
+```
+
+Default batas stale adalah 30 detik.
+
+### 11.5 Histori telemetry
+
+Query dashboard:
+
+```text
+/api/telemetry/history?limit=55&hours=6
+```
+
+Aturan validasi:
+
+| Parameter | Default | Minimum | Maksimum |
+| --- | ---: | ---: | ---: |
+| `limit` | 55 | 2 | 500 |
+| `hours` | 6 | 1 | 168 |
+
+Server mengambil data dengan:
+
+```text
+agg=NONE
+orderBy=DESC
+```
+
+Kemudian:
+
+1. Menggabungkan key yang memiliki timestamp sama.
+2. Mengurutkan titik dari lama ke baru.
+3. Menormalisasi tipe data.
+4. Menggabungkan burst dengan jarak kurang dari 1500 ms.
+5. Menyisakan maksimal jumlah `limit`.
+6. Menyimpan hasil dalam cache 5 detik.
+
+Dedup burst membantu ketika restart atau reconnect menghasilkan beberapa
+telemetry dalam waktu sangat dekat.
+
+### 11.6 Static production server
+
+Jika folder `dist/` ada, Node juga menyajikan:
+
+- HTML
+- JavaScript
+- CSS
+- SVG
+- PNG
+- ICO
+
+Path frontend yang tidak cocok dengan file akan diarahkan ke `index.html`
+agar aplikasi single-page tetap dapat dibuka.
+
+## 12. Bentuk Respons API Lokal
+
+### 12.1 Latest
+
+```json
+{
+  "source": "thingsboard",
+  "connected": true,
+  "deviceOnline": true,
+  "receivedAt": "ISO-8601 timestamp",
+  "telemetry": {
+    "timestamp": 0,
+    "ph": 0,
+    "tds": 0,
+    "ntu": 0,
+    "score": 0,
+    "level": 0,
+    "status": "PERLU TREATMENT",
+    "ss": "PERLU TRT.",
+    "recommendation": "...",
+    "phCategory": "ASAM",
+    "phOk": false,
+    "tdsOk": true,
+    "turbOk": false
+  }
+}
+```
+
+### 12.2 History
+
+```json
+{
+  "source": "thingsboard",
+  "hours": 6,
+  "history": [
+    {
+      "timestamp": 0,
+      "ph": 0,
+      "tds": 0,
+      "ntu": 0,
+      "score": 0,
+      "level": 0,
+      "ss": "TDK LAYAK"
+    }
+  ]
+}
+```
+
+## 13. Alur Dashboard React
+
+### 13.1 Saat halaman dibuka
+
+```mermaid
+sequenceDiagram
+    participant UI as React
+    participant API as Node API
+    participant TB as ThingsBoard
+
+    UI->>API: GET /api/telemetry/history
+    API->>TB: Login jika JWT kosong
+    API->>TB: Ambil histori 6 jam
+    TB-->>API: Time-series
+    API-->>UI: Maksimal 55 titik
+    UI->>API: GET /api/telemetry/latest
+    API->>TB: Ambil latest telemetry
+    TB-->>API: Nilai terakhir
+    API-->>UI: Data dan deviceOnline
+```
+
+Histori dimuat lebih dulu, kemudian polling latest dimulai.
+
+### 13.2 Polling
+
+Saat tab aktif:
+
+```text
+1 request setiap 1000 ms setelah request sebelumnya selesai
+```
+
+Saat tab tersembunyi:
+
+```text
+1 request setiap 10000 ms
+```
+
+Tidak ada request baru jika request sebelumnya masih berjalan. Karena timer
+baru dipasang setelah request selesai, interval nyata adalah:
+
+```text
+waktu request + delay polling
+```
+
+### 13.3 Penambahan grafik
+
+Dashboard menyimpan `lastTimestamp`. Titik hanya ditambahkan jika:
+
+```text
+next.timestamp > lastTimestamp
+```
+
+Artinya:
+
+- Polling 1 detik tidak menggandakan titik lama.
+- Firmware tetap menjadi penghasil sampel baru setiap sekitar 2 detik.
+- Grafik bergerak ketika ThingsBoard menerima timestamp baru.
+- Maksimal 55 titik disimpan di browser.
+
+### 13.4 Status koneksi
+
+| UI | Kondisi |
+| --- | --- |
+| `CONNECTING` | Request awal belum selesai |
+| `LIVE` | API berhasil dan timestamp belum melewati batas stale |
+| `STALE` | ThingsBoard dapat dibaca tetapi ESP32 tidak mengirim data baru |
+| `OFFLINE` | API, login, device, jaringan, atau request bermasalah |
+
+Jika ESP32 dicabut, dashboard dapat tetap terlihat "berjalan" karena:
+
+1. Data terakhir masih tersimpan di ThingsBoard.
+2. Node tetap dapat mengambil data tersebut.
+3. Grafik histori tetap tersedia.
+4. Status baru berubah menjadi `STALE` setelah default 30 detik.
+
+Ini bukan berarti sensor masih mengirim data.
+
+### 13.5 Grafik
+
+Grafik menggunakan empat `YAxis` terpisah:
+
+| Seri | Domain |
+| --- | --- |
+| pH | 0 sampai 14 |
+| TDS | 0 sampai 5000 |
+| NTU | 0 sampai 1000 |
+| Fuzzy score | 0 sampai 100 |
+
+Hanya sumbu pH yang terlihat, tetapi setiap seri dihitung pada skalanya
+sendiri. Ini mencegah garis pH terlihat datar ketika NTU bernilai ratusan atau
+ribuan.
+
+Animasi Recharts dinonaktifkan untuk setiap area agar pembaruan real-time
+lebih stabil.
+
+## 14. Jalur Data End-to-End
+
+Satu sampel menempuh alur berikut:
+
+1. Sensor mengeluarkan tegangan analog.
+2. ESP32 mengambil 30 sampel per sensor.
+3. Raw ADC dirata-rata.
+4. Raw ADC dikonversi menjadi tegangan.
+5. Tegangan dikonversi menjadi pH, TDS, dan NTU.
+6. Nilai masuk ke fungsi keanggotaan.
+7. Derajat keanggotaan mengaktifkan beberapa aturan.
+8. Weighted average menghasilkan fuzzy score.
+9. Score menghasilkan level, label, dan rekomendasi.
+10. ESP32 membuat JSON.
+11. ESP32 mengirim JSON ke ThingsBoard.
+12. ThingsBoard menyimpan latest dan time-series.
+13. Node login sebagai tenant dan membaca data device.
+14. Node menormalisasi key untuk kebutuhan frontend.
+15. React mengambil data latest setiap 1 detik.
+16. Jika timestamp berubah, UI dan grafik diperbarui.
+
+## 15. Timing dan Latensi
+
+| Proses | Interval/waktu |
+| --- | --- |
+| Satu batch ADC | Sekitar 300 ms |
+| Tiga sensor | Sekitar 900 ms |
+| Target siklus firmware | 2000 ms |
+| Polling dashboard aktif | 1000 ms |
+| Polling tab tersembunyi | 10000 ms |
+| Cache latest Node | 500 ms |
+| Cache history Node | 5000 ms |
+| Dedup burst history | 1500 ms |
+| Timeout request browser | 8000 ms |
+| Device dianggap stale | Default 30000 ms |
+
+Ekspektasi normal:
+
+```text
+ESP32 menghasilkan sampel baru sekitar setiap 2 detik.
+Dashboard mengetahui sampel baru sekitar 0 sampai 1+ detik setelah tersedia.
+```
+
+Dashboard mengecek setiap 1 detik, tetapi tidak dapat membuat data sensor baru
+lebih cepat daripada firmware.
+
+## 16. Mode Development dan Produksi
+
+### 16.1 Development
+
+Dua proses dijalankan:
+
+```text
+Terminal 1: npm run server:dev
+Terminal 2: npm run dev -- --host 0.0.0.0
+```
+
+Alurnya:
+
+```text
+Browser :5173 -> Vite proxy -> Node :3001 -> ThingsBoard
+```
+
+### 16.2 Produksi lokal
+
+```text
+npm run build
+npm start
+```
+
+Alurnya:
+
+```text
+Browser :3001 -> Node API + dist frontend -> ThingsBoard
+```
+
+Satu proses Node melayani frontend dan API.
+
+## 17. Build dan Upload Firmware
+
+PlatformIO membaca:
+
+```text
+platformio.ini -> firmware/main.cpp -> src/monitor_air_asam_tambang.ino
+```
+
+Perintah utama:
+
+```powershell
+platformio run
+platformio run --target upload
+platformio device monitor --port COM3 --baud 115200
+```
+
+Jika upload gagal karena ESP32 tidak masuk download mode, gunakan tombol
+BOOT dan EN/RESET sesuai panduan pada README.
+
+Perubahan pada file `.ino` baru berlaku di hardware setelah firmware
+di-build dan di-upload ulang.
+
+## 18. Keamanan
+
+### 18.1 Credential firmware
+
+Firmware saat ini menyimpan langsung:
+
+- SSID WiFi.
+- Password WiFi.
+- Host ThingsBoard.
+- Device access token.
+
+Karena file firmware merupakan source code, nilai tersebut berisiko terbaca
+ketika proyek dibagikan.
+
+### 18.2 Credential backend
+
+Credential tenant disimpan di `.env`, bukan di React. Ini benar secara
+arsitektur karena browser tidak menerima password tenant.
+
+### 18.3 API lokal
+
+Endpoint Node lokal belum memiliki autentikasi. Siapa pun yang dapat
+mengakses port server pada jaringan dapat membaca telemetry. Untuk demo lokal
+ini sederhana, tetapi untuk deployment publik perlu reverse proxy, HTTPS,
+firewall, dan autentikasi.
+
+### 18.4 Rekomendasi dasar
+
+- Jangan commit `.env`.
+- Jangan menampilkan token device pada screenshot.
+- Ganti token jika pernah tersebar.
+- Gunakan akun ThingsBoard khusus dengan izin minimum.
+- Hindari membuka port Node langsung ke internet.
+- Gunakan HTTPS jika dashboard dipublikasikan.
+
+## 19. Batasan dan Catatan Teknis
+
+1. Komentar firmware masih menyebut 30 rules, tetapi kode memiliki 33 aturan.
+2. Dashboard benar menampilkan 33 rules.
+3. Konfigurasi WiFi dan token masih hardcoded di `.ino`.
+4. Port serial dikunci ke `COM3`.
+5. Tidak ada sensor suhu untuk kompensasi TDS dinamis.
+6. Konversi turbiditas linear dan sangat bergantung pada dua titik kalibrasi.
+7. Rentang kalibrasi turbiditas aktif hanya 0.18 V.
+8. Tidak ada penyaringan median atau outlier selain rata-rata 30 sampel.
+9. Tidak ada penyimpanan lokal ESP32 ketika ThingsBoard tidak dapat diakses.
+10. MQTT fallback hanya mencoba singkat dan tidak membuat antrean retry.
+11. Dashboard memakai polling, bukan WebSocket atau MQTT langsung.
+12. Histori dashboard bergantung pada data yang tersimpan di ThingsBoard.
+13. Server menyimpan JWT dan cache hanya di memori, sehingga hilang saat restart.
+14. Belum ada automated test untuk fuzzy, API, atau komponen React.
+15. Beberapa aset template masih ada tetapi tidak digunakan.
+16. `index.html` masih memakai judul sederhana `aquasense` dan `lang="en"`.
+17. Google Fonts memerlukan akses internet saat halaman dimuat.
+
+## 20. Titik Perubahan Berdasarkan Kebutuhan
+
+| Kebutuhan | File |
+| --- | --- |
+| Ubah kalibrasi sensor | `src/monitor_air_asam_tambang.ino` |
+| Ubah membership fuzzy | `src/monitor_air_asam_tambang.ino` |
+| Ubah rule fuzzy | `src/monitor_air_asam_tambang.ino` |
+| Ubah interval kirim ESP32 | `SEND_MS` di file `.ino` |
+| Ubah port ESP32 | `platformio.ini` |
+| Ubah akun/device ThingsBoard | `.env` |
+| Ubah interval polling UI | `src/hooks/useTelemetry.js` |
+| Ubah jumlah titik grafik | URL history dan `.slice(-55)` di hook |
+| Ubah warna | `src/utils/theme.js` |
+| Ubah layout utama | `src/components/AquaSense.jsx` |
+| Ubah bentuk gauge/widget | `src/components/ui/Widgets.jsx` |
+| Ubah cache API | `server/index.js` |
+| Ubah proxy development | `vite.config.js` |
+
+## 21. Cara Memverifikasi Sistem
+
+### 21.1 Firmware
+
+```powershell
+platformio run
+```
+
+Setelah upload, Serial Monitor seharusnya menunjukkan:
+
+- WiFi berhasil.
+- Nilai raw dan tegangan.
+- Membership pH, TDS, dan NTU.
+- Fuzzy score dan status.
+- HTTP 2xx atau MQTT fallback berhasil.
+- Payload JSON.
+
+### 21.2 API
+
+```powershell
+Invoke-RestMethod http://localhost:3001/api/health
+Invoke-RestMethod http://localhost:3001/api/telemetry/latest
+Invoke-RestMethod "http://localhost:3001/api/telemetry/history?limit=55&hours=6"
+```
+
+### 21.3 Frontend
+
+```powershell
+npm run lint
+npm run build
+```
+
+Periksa bahwa:
+
+- Header berubah menjadi `LIVE` ketika telemetry baru masuk.
+- Angka gauge sama dengan endpoint latest.
+- Fuzzy score dan status sama dengan Serial Monitor.
+- Grafik bertambah hanya saat timestamp baru diterima.
+- Setelah ESP32 dicabut, status akhirnya menjadi `STALE`.
+
+## 22. Kesimpulan Arsitektur
+
+Sumber kebenaran kualitas air berada di ESP32:
+
+```text
+sensor -> firmware -> fuzzy result
+```
+
+ThingsBoard berfungsi sebagai transport dan penyimpanan:
+
+```text
+fuzzy result -> telemetry latest + history
+```
+
+Node berfungsi sebagai pengaman credential dan adapter data:
+
+```text
+ThingsBoard REST -> format dashboard
+```
+
+React berfungsi sebagai visualisasi:
+
+```text
+latest + history -> gauge + status + chart + log
+```
+
+Dengan desain ini, perubahan tampilan dashboard tidak mengubah logika fuzzy.
+Sebaliknya, perubahan membership, kalibrasi, atau rule pada firmware harus
+di-upload ulang ke ESP32 sebelum hasil baru terlihat di ThingsBoard dan
+dashboard.
