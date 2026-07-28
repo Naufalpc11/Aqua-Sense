@@ -1,0 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@300;400;600;700&display=swap');
+
+*, *::before, *::after {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+html,
+body,
+#root {
+	min-height: 100%;
+	width: 100%;
+	max-width: 100%;
+	overflow-x: hidden;
+	background: #01080f;
+}
+
+body {
+	color: #d9f2fb;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+}
+
+img,
+svg,
+video,
+canvas {
+	display: block;
+	max-width: 100%;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #01080f; }
+::-webkit-scrollbar-thumb { background: #0a2438; border-radius: 3px; }
+
+@keyframes pls { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .4; transform: scale(.82); } }
+@keyframes flt { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes nw { 0% { background: rgba(0,245,228,.14); } 100% { background: transparent; } }
+
+.pls { animation: pls 2s ease-in-out infinite; }
+.flt { animation: flt 4s ease-in-out infinite; }
+.trh:hover td { background: rgba(0,245,228,.04) !important; }
+.nw-anim { animation: nw .7s ease-out forwards; }

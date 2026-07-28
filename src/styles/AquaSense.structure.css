@@ -1,0 +1,73 @@
+.App,
+.aqua-shell,
+.aqua-main {
+	width: 100%;
+	max-width: 100vw;
+	min-width: 0;
+	overflow-x: hidden;
+}
+
+.aqua-shell {
+	background: #01080f;
+}
+
+.aqua-main {
+	width: min(100%, 1440px);
+}
+
+.aqua-header {
+	width: 100%;
+}
+
+.aqua-header-inner {
+	width: min(100%, 1440px);
+	min-width: 0;
+}
+
+.aqua-brand,
+.aqua-brand-text,
+.aqua-header-meta,
+.aqua-hero,
+.aqua-hero-copy,
+.aqua-hero-metrics,
+.aqua-hero-metric,
+.aqua-card-head,
+.aqua-log-head,
+.aqua-card,
+.aqua-grid > *,
+.aqua-log-table,
+.aqua-log-table td,
+.aqua-log-table th {
+	min-width: 0;
+}
+
+.aqua-brand-text {
+	overflow: hidden;
+}
+
+.aqua-header-inner > *,
+.aqua-hero > * {
+	max-width: 100%;
+}
+
+.aqua-badges {
+	min-width: 0;
+	flex-wrap: wrap;
+}
+
+.aqua-brand-title,
+.aqua-brand-subtitle,
+.aqua-hero-kicker,
+.aqua-site-line,
+.aqua-message-line,
+.aqua-status-title {
+	overflow-wrap: anywhere;
+}
+
+.aqua-hero-copy {
+	flex: 1 1 420px;
+}
+
+.aqua-hero-metrics {
+	flex: 0 1 420px;
+}

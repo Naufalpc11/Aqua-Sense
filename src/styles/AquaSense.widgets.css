@@ -1,0 +1,52 @@
+.aqua-card,
+.aqua-gauge-card {
+	overflow: hidden;
+}
+
+.aqua-grid-gauges {
+	grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+}
+
+.aqua-grid-analysis {
+	grid-template-columns: minmax(0, 3fr) minmax(220px, 1fr) !important;
+}
+
+.aqua-grid-flowlog {
+	grid-template-columns: minmax(280px, 1fr) minmax(0, 2fr) !important;
+}
+
+.aqua-gauge-card {
+	min-height: 214px;
+	justify-content: space-between;
+}
+
+.aqua-score-card {
+	min-height: 214px;
+}
+
+.aqua-chart-card,
+.aqua-side-card,
+.aqua-flow-card,
+.aqua-log-card {
+	overflow: hidden;
+}
+
+.aqua-chart-legend {
+	min-width: 0;
+}
+
+.aqua-log-table-wrap {
+	width: 100%;
+	min-width: 0;
+}
+
+.card {
+	background: #041525;
+	border: 1px solid rgba(0,245,228,.09);
+	border-radius: 14px;
+	transition: border-color .3s, box-shadow .3s;
+}
+.card:hover {
+	border-color: rgba(0,245,228,.2);
+	box-shadow: 0 0 38px rgba(0,245,228,.06);
+}
