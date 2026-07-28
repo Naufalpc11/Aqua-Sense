@@ -38,6 +38,11 @@ export default function AquaSense() {
         ? 'CONNECTING'
         : 'OFFLINE';
   const upFmt = `${String(Math.floor(uptime / 3600)).padStart(2, '0')}:${String(Math.floor((uptime % 3600) / 60)).padStart(2, '0')}:${String(uptime % 60).padStart(2, '0')}`;
+  const heroMetrics = [
+    { l: 'pH', v: data.ph.toFixed(2), u: '', c: T.ph, ok: data.phOk },
+    { l: 'TDS', v: `${Math.round(data.tds)}`, u: 'ppm', c: T.tds, ok: data.tdsOk },
+    { l: 'NTU', v: data.ntu.toFixed(1), u: '', c: T.ntu, ok: data.turbOk },
+  ];
 
   return (
     <>
@@ -92,11 +97,11 @@ export default function AquaSense() {
               <div className="aqua-site-line" style={{ fontSize: '11px', color: 'rgba(200,232,245,.28)', letterSpacing: '1px', fontFamily: "'IBM Plex Mono',monospace" }}>📍 Bio-Filter Tank Unit #1 &nbsp;·&nbsp; ESP32 V4 + 3 Sensor + Fuzzy Logic AI (33 Rules)</div>
               <div className="aqua-message-line" style={{ fontSize: '10px', color: sc, marginTop: '7px', fontFamily: "'IBM Plex Mono',monospace" }}>{hasData ? data.recommendation : connection.message}</div>
             </div>
-            <div className="aqua-hero-metrics" style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-              {[{ l: 'pH', v: data.ph.toFixed(2), u: '', c: T.ph, ok: data.phOk }, { l: 'TDS', v: `${data.tds}`, u: 'ppm', c: T.tds, ok: data.tdsOk }, { l: 'NTU', v: data.ntu.toFixed(1), u: '', c: T.ntu, ok: data.turbOk }].map(s => (
+            <div className="aqua-hero-metrics" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '16px', alignItems: 'center' }}>
+              {heroMetrics.map(s => (
                 <div key={s.l} className="aqua-hero-metric" style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '8.5px', color: 'rgba(200,232,245,.25)', letterSpacing: '2.5px', marginBottom: '5px', fontFamily: "'IBM Plex Mono',monospace" }}>{s.l}</div>
-                  <div style={{ fontSize: '28px', fontWeight: '700', color: s.c, lineHeight: '1', fontFamily: "'IBM Plex Mono',monospace", textShadow: `0 0 14px ${s.c}60`, transition: 'color .3s' }}>{s.v}</div>
+                  <div style={{ fontSize: '28px', fontWeight: '700', color: s.c, lineHeight: '1', fontFamily: "'IBM Plex Mono',monospace", fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', textShadow: `0 0 14px ${s.c}60`, transition: 'color .3s' }}>{s.v}</div>
                   {s.u && <div style={{ fontSize: '9px', color: 'rgba(200,232,245,.28)', marginTop: '2px', fontFamily: "'IBM Plex Mono',monospace" }}>{s.u}</div>}
                   <div style={{ fontSize: '8px', color: s.ok ? T.ok : T.warn, marginTop: '5px', letterSpacing: '1.5px' }}>{s.ok ? '● OK' : '● WARN'}</div>
                 </div>
