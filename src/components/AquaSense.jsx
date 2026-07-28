@@ -49,28 +49,28 @@ export default function AquaSense() {
         
         {/* ━━━ HEADER ━━━ */}
         <header className="aqua-header" style={{ position: 'sticky', top: 0, zIndex: 200, background: 'rgba(1,8,15,.97)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(0,245,228,.1)', boxShadow: '0 2px 28px rgba(0,0,0,.7)' }}>
-          <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '0 22px', height: '62px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div className="flt" style={{ width: '46px', height: '46px', borderRadius: '12px', flexShrink: 0, background: 'linear-gradient(135deg,rgba(0,245,228,.18),rgba(0,100,255,.13))', border: '1px solid rgba(0,245,228,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: '0 0 22px rgba(0,245,228,.18)' }}>💧</div>
-              <div>
-                <div style={{ fontSize: '19px', fontWeight: '700', color: T.accent, letterSpacing: '2px', textShadow: `0 0 18px ${T.accent}55`, lineHeight: '1' }}>AQUA·SENSE</div>
-                <div style={{ fontSize: '9px', color: 'rgba(200,232,245,.22)', letterSpacing: '2.5px', marginTop: '3px', fontFamily: "'IBM Plex Mono',monospace" }}>
+          <div className="aqua-header-inner" style={{ maxWidth: '1440px', margin: '0 auto', padding: '0 22px', height: '62px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="aqua-brand" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div className="flt aqua-brand-icon" style={{ width: '46px', height: '46px', borderRadius: '12px', flexShrink: 0, background: 'linear-gradient(135deg,rgba(0,245,228,.18),rgba(0,100,255,.13))', border: '1px solid rgba(0,245,228,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: '0 0 22px rgba(0,245,228,.18)' }}>💧</div>
+              <div className="aqua-brand-text">
+                <div className="aqua-brand-title" style={{ fontSize: '19px', fontWeight: '700', color: T.accent, letterSpacing: '2px', textShadow: `0 0 18px ${T.accent}55`, lineHeight: '1' }}>AQUA·SENSE</div>
+                <div className="aqua-brand-subtitle" style={{ fontSize: '9px', color: 'rgba(200,232,245,.22)', letterSpacing: '2.5px', marginTop: '3px', fontFamily: "'IBM Plex Mono',monospace" }}>
                   MONITOR AIR ASAM TAMBANG · AIoT + FUZZY LOGIC · KIC 2026
                 </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <div className="aqua-header-meta" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              <div className="aqua-connection-pill" style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                 <div className={connection.state === 'live' ? 'pls' : ''} style={{ width: '8px', height: '8px', borderRadius: '50%', background: connectionColor, boxShadow: `0 0 12px ${connectionColor}` }} />
                 <span title={connection.message} style={{ fontSize: '10px', color: connectionColor, letterSpacing: '2px', fontFamily: "'IBM Plex Mono',monospace" }}>{connectionLabel}</span>
               </div>
-              <div style={{ height: '18px', width: '1px', background: 'rgba(255,255,255,.06)' }} />
-              <div style={{ fontSize: '11px', color: 'rgba(200,232,245,.35)', fontFamily: "'IBM Plex Mono',monospace" }}>⏱ {upFmt}</div>
-              <div style={{ height: '18px', width: '1px', background: 'rgba(255,255,255,.06)' }} />
-              <div style={{ fontSize: '12px', color: 'rgba(200,232,245,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>{now.toLocaleTimeString('id-ID')}</div>
-              <div style={{ height: '18px', width: '1px', background: 'rgba(255,255,255,.06)' }} />
-              <div style={{ display: 'flex', gap: '7px' }}>
+              <div className="aqua-separator" style={{ height: '18px', width: '1px', background: 'rgba(255,255,255,.06)' }} />
+              <div className="aqua-uptime" style={{ fontSize: '11px', color: 'rgba(200,232,245,.35)', fontFamily: "'IBM Plex Mono',monospace" }}>⏱ {upFmt}</div>
+              <div className="aqua-separator" style={{ height: '18px', width: '1px', background: 'rgba(255,255,255,.06)' }} />
+              <div className="aqua-clock" style={{ fontSize: '12px', color: 'rgba(200,232,245,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>{now.toLocaleTimeString('id-ID')}</div>
+              <div className="aqua-separator" style={{ height: '18px', width: '1px', background: 'rgba(255,255,255,.06)' }} />
+              <div className="aqua-badges" style={{ display: 'flex', gap: '7px' }}>
                 {[['KIC 2026', true], ['PROTOTYPE', false]].map(([b, hi]) => (
                   <div key={b} style={{ padding: '4px 11px', borderRadius: '20px', fontSize: '9px', letterSpacing: '1.5px', background: hi ? 'rgba(0,245,228,.1)' : 'rgba(255,255,255,.04)', color: hi ? T.accent : 'rgba(200,232,245,.38)', border: `1px solid ${hi ? 'rgba(0,245,228,.3)' : 'rgba(255,255,255,.08)'}` }}>{b}</div>
                 ))}
@@ -83,18 +83,18 @@ export default function AquaSense() {
           
           {/* ── STATUS HERO ── */}
           <div className="aqua-hero" style={{ padding: '22px 28px', borderRadius: '14px', marginBottom: '20px', background: `linear-gradient(135deg,${sc}0e 0%,rgba(1,8,15,0) 65%)`, border: `1px solid ${sc}22`, boxShadow: `0 0 65px ${sc}0c`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', transition: 'all .6s ease' }}>
-            <div>
-              <div style={{ fontSize: '8.5px', color: 'rgba(200,232,245,.25)', letterSpacing: '3px', marginBottom: '12px', fontFamily: "'IBM Plex Mono',monospace" }}>STATUS KUALITAS AIR · BIO-FILTRASI AAT · PT. KIDECO JAYA AGUNG</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
+            <div className="aqua-hero-copy">
+              <div className="aqua-hero-kicker" style={{ fontSize: '8.5px', color: 'rgba(200,232,245,.25)', letterSpacing: '3px', marginBottom: '12px', fontFamily: "'IBM Plex Mono',monospace" }}>STATUS KUALITAS AIR · BIO-FILTRASI AAT · PT. KIDECO JAYA AGUNG</div>
+              <div className="aqua-status-row" style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
                 <div className={connection.state === 'live' ? 'pls' : ''} style={{ width: '11px', height: '11px', borderRadius: '50%', background: sc, boxShadow: `0 0 16px ${sc}`, flexShrink: 0 }} />
-                <div style={{ fontSize: '32px', fontWeight: '700', color: sc, letterSpacing: '2.5px', textShadow: `0 0 28px ${sc}70`, transition: 'color .5s,text-shadow .5s' }}>{data.status}</div>
+                <div className="aqua-status-title" style={{ fontSize: '32px', fontWeight: '700', color: sc, letterSpacing: '2.5px', textShadow: `0 0 28px ${sc}70`, transition: 'color .5s,text-shadow .5s' }}>{data.status}</div>
               </div>
-              <div style={{ fontSize: '11px', color: 'rgba(200,232,245,.28)', letterSpacing: '1px', fontFamily: "'IBM Plex Mono',monospace" }}>📍 Bio-Filter Tank Unit #1 &nbsp;·&nbsp; ESP32 V4 + 3 Sensor + Fuzzy Logic AI (33 Rules)</div>
-              <div style={{ fontSize: '10px', color: sc, marginTop: '7px', fontFamily: "'IBM Plex Mono',monospace" }}>{hasData ? data.recommendation : connection.message}</div>
+              <div className="aqua-site-line" style={{ fontSize: '11px', color: 'rgba(200,232,245,.28)', letterSpacing: '1px', fontFamily: "'IBM Plex Mono',monospace" }}>📍 Bio-Filter Tank Unit #1 &nbsp;·&nbsp; ESP32 V4 + 3 Sensor + Fuzzy Logic AI (33 Rules)</div>
+              <div className="aqua-message-line" style={{ fontSize: '10px', color: sc, marginTop: '7px', fontFamily: "'IBM Plex Mono',monospace" }}>{hasData ? data.recommendation : connection.message}</div>
             </div>
-            <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
+            <div className="aqua-hero-metrics" style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
               {[{ l: 'pH', v: data.ph.toFixed(2), u: '', c: T.ph, ok: data.phOk }, { l: 'TDS', v: `${data.tds}`, u: 'ppm', c: T.tds, ok: data.tdsOk }, { l: 'NTU', v: data.ntu.toFixed(1), u: '', c: T.ntu, ok: data.turbOk }].map(s => (
-                <div key={s.l} style={{ textAlign: 'center' }}>
+                <div key={s.l} className="aqua-hero-metric" style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: '8.5px', color: 'rgba(200,232,245,.25)', letterSpacing: '2.5px', marginBottom: '5px', fontFamily: "'IBM Plex Mono',monospace" }}>{s.l}</div>
                   <div style={{ fontSize: '28px', fontWeight: '700', color: s.c, lineHeight: '1', fontFamily: "'IBM Plex Mono',monospace", textShadow: `0 0 14px ${s.c}60`, transition: 'color .3s' }}>{s.v}</div>
                   {s.u && <div style={{ fontSize: '9px', color: 'rgba(200,232,245,.28)', marginTop: '2px', fontFamily: "'IBM Plex Mono',monospace" }}>{s.u}</div>}
@@ -111,7 +111,7 @@ export default function AquaSense() {
               { v: data.tds, min: 0, max: 2000, c: T.tds, unit: 'ppm', id: 'tds', dec: 0, lbl: 'TDS METER V1.0 · ppm', ok: data.tdsOk, st: data.tds < 500 ? 'BAIK' : data.tds < 1000 ? 'SEDANG' : 'TINGGI' },
               { v: data.ntu, min: 0, max: 1000, c: T.ntu, unit: 'NTU', id: 'ntu', dec: 1, lbl: 'TURBIDITY · KEKERUHAN AIR', ok: data.turbOk, st: data.ntu < 5 ? 'JERNIH' : data.ntu < 100 ? 'AGAK KERUH' : 'KERUH' },
             ].map((g, i) => (
-              <div key={i} className="card" style={{ padding: '15px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderTop: `2px solid ${g.c}` }}>
+              <div key={i} className="card aqua-gauge-card" style={{ padding: '15px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderTop: `2px solid ${g.c}` }}>
                 <div style={{ fontSize: '8px', letterSpacing: '1.5px', color: 'rgba(200,232,245,.25)', marginBottom: '5px', alignSelf: 'flex-start', fontFamily: "'IBM Plex Mono',monospace" }}>{g.lbl}</div>
                 <ArcGauge value={g.v} min={g.min} max={g.max} color={g.c} unit={g.unit} id={g.id} decimals={g.dec} />
                 <div style={{ marginTop: '7px', padding: '4px 14px', borderRadius: '20px', fontSize: '9.5px', letterSpacing: '1.5px', background: `${g.ok ? T.ok : T.warn}18`, color: g.ok ? T.ok : T.warn, border: `1px solid ${g.ok ? T.ok : T.warn}30` }}>
@@ -120,7 +120,7 @@ export default function AquaSense() {
               </div>
             ))}
             {/* Fuzzy Score Card */}
-            <div className="card" style={{ padding: '15px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderTop: `2px solid ${sc}`, boxShadow: `0 0 45px ${sc}18`, transition: 'box-shadow .5s,border-color .5s' }}>
+            <div className="card aqua-gauge-card aqua-score-card" style={{ padding: '15px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderTop: `2px solid ${sc}`, boxShadow: `0 0 45px ${sc}18`, transition: 'box-shadow .5s,border-color .5s' }}>
               <div style={{ fontSize: '8px', letterSpacing: '1.5px', color: 'rgba(200,232,245,.25)', marginBottom: '5px', alignSelf: 'flex-start', fontFamily: "'IBM Plex Mono',monospace" }}>FUZZY LOGIC AI · MAMDANI · 33 RULES</div>
               <ScoreRing score={data.score} level={data.level} />
               <div style={{ marginTop: '7px', padding: '5px 16px', borderRadius: '20px', fontSize: '10px', fontWeight: '600', letterSpacing: '1.5px', background: `${sc}18`, color: sc, border: `1px solid ${sc}30`, textShadow: `0 0 12px ${sc}60` }}>{data.ss}</div>
@@ -130,12 +130,12 @@ export default function AquaSense() {
           {/* ── CHART + VISUALIZER ROW ── */}
           <div className="aqua-grid aqua-grid-analysis" style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '16px', marginBottom: '20px' }}>
             <div className="card aqua-card aqua-chart-card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
+              <div className="aqua-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(200,232,245,.75)' }}>Tren Sensor Real-Time</div>
                   <div style={{ fontSize: '9px', color: 'rgba(200,232,245,.25)', letterSpacing: '1px', marginTop: '3px', fontFamily: "'IBM Plex Mono',monospace" }}>Auto-update {pollMs / 1000}s · {hist.length} titik data</div>
                 </div>
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className="aqua-chart-legend" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {[{ c: T.ph, l: 'pH' }, { c: T.tds, l: 'TDS' }, { c: T.ntu, l: 'NTU' }, { c: T.ai, l: 'Fuzzy Score' }].map(i => (
                     <div key={i.l} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '9.5px', color: 'rgba(200,232,245,.32)', fontFamily: "'IBM Plex Mono',monospace" }}>
                       <span style={{ width: '16px', height: '2px', background: i.c, display: 'inline-block', borderRadius: '1px', boxShadow: `0 0 5px ${i.c}` }} /> {i.l}
@@ -184,7 +184,7 @@ export default function AquaSense() {
             <div className="card aqua-card aqua-flow-card" style={{ padding: '18px' }}>
               <div style={{ fontSize: '8.5px', color: 'rgba(200,232,245,.25)', letterSpacing: '2px', marginBottom: '14px', fontFamily: "'IBM Plex Mono',monospace" }}>ALUR BIO-FILTRASI SISTEM</div>
               <FlowDiagram />
-              <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,.05)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+              <div className="aqua-flow-specs" style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,.05)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                 {[
                   { l: 'Mikrokontroler', v: 'ESP32 V4', c: T.accent }, { l: 'Algoritma AI', v: 'Fuzzy Logic', c: T.ai }, { l: 'IoT Platform', v: 'ThingsBoard', c: T.tds },
                   { l: 'Sensor pH', v: 'PH-4502C', c: T.ph }, { l: 'Sensor TDS', v: 'TDS V1.0', c: T.tds }, { l: 'Sensor Turb.', v: 'Turbidity', c: T.ntu }
@@ -198,7 +198,7 @@ export default function AquaSense() {
             </div>
 
             <div className="card aqua-card aqua-log-card" style={{ padding: '18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '13px' }}>
+              <div className="aqua-card-head aqua-log-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '13px' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(200,232,245,.7)' }}>Log Sensor Real-Time</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
                   <div className={connection.state === 'live' ? 'pls' : ''} style={{ width: '6px', height: '6px', borderRadius: '50%', background: connectionColor, boxShadow: `0 0 8px ${connectionColor}` }} />
