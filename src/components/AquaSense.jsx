@@ -42,13 +42,13 @@ export default function AquaSense() {
   return (
     <>
       {/* Backgrounds */}
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='58' height='50'%3E%3Cpolygon points='29,2 56,17 56,34 29,49 2,34 2,17' fill='none' stroke='rgba(0,245,228,.04)' stroke-width='1'/%3E%3C/svg%3E")`, backgroundSize: '58px 50px' }} />
-      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999, background: 'repeating-linear-gradient(180deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px)' }} />
+      <div className="aqua-bg aqua-bg-pattern" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='58' height='50'%3E%3Cpolygon points='29,2 56,17 56,34 29,49 2,34 2,17' fill='none' stroke='rgba(0,245,228,.04)' stroke-width='1'/%3E%3C/svg%3E")`, backgroundSize: '58px 50px' }} />
+      <div className="aqua-bg aqua-bg-scan" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9999, background: 'repeating-linear-gradient(180deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px)' }} />
 
-      <div style={{ minHeight: '100vh', background: T.bg, fontFamily: "'Chakra Petch',sans-serif", color: T.txt, position: 'relative', zIndex: 1 }}>
+      <div className="aqua-shell" style={{ minHeight: '100vh', background: T.bg, fontFamily: "'Chakra Petch',sans-serif", color: T.txt, position: 'relative', zIndex: 1 }}>
         
         {/* ━━━ HEADER ━━━ */}
-        <header style={{ position: 'sticky', top: 0, zIndex: 200, background: 'rgba(1,8,15,.97)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(0,245,228,.1)', boxShadow: '0 2px 28px rgba(0,0,0,.7)' }}>
+        <header className="aqua-header" style={{ position: 'sticky', top: 0, zIndex: 200, background: 'rgba(1,8,15,.97)', backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(0,245,228,.1)', boxShadow: '0 2px 28px rgba(0,0,0,.7)' }}>
           <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '0 22px', height: '62px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
               <div className="flt" style={{ width: '46px', height: '46px', borderRadius: '12px', flexShrink: 0, background: 'linear-gradient(135deg,rgba(0,245,228,.18),rgba(0,100,255,.13))', border: '1px solid rgba(0,245,228,.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', boxShadow: '0 0 22px rgba(0,245,228,.18)' }}>💧</div>
@@ -79,10 +79,10 @@ export default function AquaSense() {
           </div>
         </header>
 
-        <main style={{ maxWidth: '1440px', margin: '0 auto', padding: '20px 22px' }}>
+        <main className="aqua-main" style={{ maxWidth: '1440px', margin: '0 auto', padding: '20px 22px' }}>
           
           {/* ── STATUS HERO ── */}
-          <div style={{ padding: '22px 28px', borderRadius: '14px', marginBottom: '20px', background: `linear-gradient(135deg,${sc}0e 0%,rgba(1,8,15,0) 65%)`, border: `1px solid ${sc}22`, boxShadow: `0 0 65px ${sc}0c`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', transition: 'all .6s ease' }}>
+          <div className="aqua-hero" style={{ padding: '22px 28px', borderRadius: '14px', marginBottom: '20px', background: `linear-gradient(135deg,${sc}0e 0%,rgba(1,8,15,0) 65%)`, border: `1px solid ${sc}22`, boxShadow: `0 0 65px ${sc}0c`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', transition: 'all .6s ease' }}>
             <div>
               <div style={{ fontSize: '8.5px', color: 'rgba(200,232,245,.25)', letterSpacing: '3px', marginBottom: '12px', fontFamily: "'IBM Plex Mono',monospace" }}>STATUS KUALITAS AIR · BIO-FILTRASI AAT · PT. KIDECO JAYA AGUNG</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '10px' }}>
@@ -105,7 +105,7 @@ export default function AquaSense() {
           </div>
 
           {/* ── GAUGE ROW ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.15fr', gap: '16px', marginBottom: '20px' }}>
+          <div className="aqua-grid aqua-grid-gauges" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1.15fr', gap: '16px', marginBottom: '20px' }}>
             {[
               { v: data.ph, min: 0, max: 14, c: T.ph, unit: 'pH', id: 'ph', dec: 2, lbl: 'pH SENSOR · PH-4502C', ok: data.phOk, st: data.phCategory ? data.phCategory.replaceAll('_', ' ') : 'NO DATA' },
               { v: data.tds, min: 0, max: 2000, c: T.tds, unit: 'ppm', id: 'tds', dec: 0, lbl: 'TDS METER V1.0 · ppm', ok: data.tdsOk, st: data.tds < 500 ? 'BAIK' : data.tds < 1000 ? 'SEDANG' : 'TINGGI' },
@@ -128,8 +128,8 @@ export default function AquaSense() {
           </div>
 
           {/* ── CHART + VISUALIZER ROW ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '16px', marginBottom: '20px' }}>
-            <div className="card" style={{ padding: '20px' }}>
+          <div className="aqua-grid aqua-grid-analysis" style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '16px', marginBottom: '20px' }}>
+            <div className="card aqua-card aqua-chart-card" style={{ padding: '20px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '18px' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: 'rgba(200,232,245,.75)' }}>Tren Sensor Real-Time</div>
@@ -168,7 +168,7 @@ export default function AquaSense() {
               </ResponsiveContainer>
             </div>
 
-            <div className="card" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
+            <div className="card aqua-card aqua-side-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column' }}>
               <div style={{ fontSize: '12px', fontWeight: '600', color: 'rgba(200,232,245,.6)', marginBottom: '6px', letterSpacing: '.5px' }}>Visualisasi Sampel Air</div>
               <WaterSample ph={data.ph} ntu={data.ntu} />
               <div>
@@ -180,8 +180,8 @@ export default function AquaSense() {
           </div>
 
           {/* ── FLOW + LOG ROW ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '20px' }}>
-            <div className="card" style={{ padding: '18px' }}>
+          <div className="aqua-grid aqua-grid-flowlog" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px', marginBottom: '20px' }}>
+            <div className="card aqua-card aqua-flow-card" style={{ padding: '18px' }}>
               <div style={{ fontSize: '8.5px', color: 'rgba(200,232,245,.25)', letterSpacing: '2px', marginBottom: '14px', fontFamily: "'IBM Plex Mono',monospace" }}>ALUR BIO-FILTRASI SISTEM</div>
               <FlowDiagram />
               <div style={{ marginTop: '16px', paddingTop: '14px', borderTop: '1px solid rgba(255,255,255,.05)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
@@ -197,7 +197,7 @@ export default function AquaSense() {
               </div>
             </div>
 
-            <div className="card" style={{ padding: '18px' }}>
+            <div className="card aqua-card aqua-log-card" style={{ padding: '18px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '13px' }}>
                 <div style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(200,232,245,.7)' }}>Log Sensor Real-Time</div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
@@ -205,8 +205,8 @@ export default function AquaSense() {
                   <span style={{ fontSize: '8.5px', color: 'rgba(200,232,245,.28)', letterSpacing: '2px', fontFamily: "'IBM Plex Mono',monospace" }}>THINGSBOARD · {pollMs / 1000}s INTERVAL</span>
                 </div>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace" }}>
+              <div className="aqua-log-table-wrap" style={{ overflowX: 'auto' }}>
+                <table className="aqua-log-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px', fontFamily: "'IBM Plex Mono',monospace" }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,.07)' }}>
                       {['WAKTU', 'pH', 'TDS (ppm)', 'TURB (NTU)', 'FUZZY SCORE', 'STATUS'].map(h => (
@@ -218,13 +218,13 @@ export default function AquaSense() {
                     {log.map((row, i) => {
                       const rc = row.level === 2 ? T.ok : row.level === 1 ? T.warn : T.err;
                       return (
-                        <tr key={`r-${i}-${i === 0 ? row.ts : i}`} className={`trh${i === 0 ? ' nw-anim' : ''}`} style={{ borderBottom: '1px solid rgba(255,255,255,.03)', opacity: .62 + Math.max(0, 7 - i) * .055 }}>
-                          <td style={{ padding: '7px 10px', color: 'rgba(200,232,245,.32)' }}>{row.ts}</td>
-                          <td style={{ padding: '7px 10px', color: T.ph, fontWeight: '600' }}>{row.ph.toFixed(2)}</td>
-                          <td style={{ padding: '7px 10px', color: T.tds, fontWeight: '600' }}>{row.tds}</td>
-                          <td style={{ padding: '7px 10px', color: T.ntu, fontWeight: '600' }}>{row.ntu.toFixed(1)}</td>
-                          <td style={{ padding: '7px 10px', color: rc, fontWeight: '700' }}>{row.score.toFixed(1)}</td>
-                          <td style={{ padding: '7px 10px' }}>
+                        <tr key={`r-${i}-${i === 0 ? row.ts : i}`} className={`trh aqua-log-row${i === 0 ? ' nw-anim' : ''}`} style={{ borderBottom: '1px solid rgba(255,255,255,.03)', opacity: .62 + Math.max(0, 7 - i) * .055 }}>
+                          <td data-label="WAKTU" style={{ padding: '7px 10px', color: 'rgba(200,232,245,.32)' }}>{row.ts}</td>
+                          <td data-label="pH" style={{ padding: '7px 10px', color: T.ph, fontWeight: '600' }}>{row.ph.toFixed(2)}</td>
+                          <td data-label="TDS (ppm)" style={{ padding: '7px 10px', color: T.tds, fontWeight: '600' }}>{row.tds}</td>
+                          <td data-label="TURB (NTU)" style={{ padding: '7px 10px', color: T.ntu, fontWeight: '600' }}>{row.ntu.toFixed(1)}</td>
+                          <td data-label="FUZZY SCORE" style={{ padding: '7px 10px', color: rc, fontWeight: '700' }}>{row.score.toFixed(1)}</td>
+                          <td data-label="STATUS" style={{ padding: '7px 10px' }}>
                             <span style={{ padding: '3px 9px', borderRadius: '10px', fontSize: '9px', letterSpacing: '1px', background: `${rc}18`, color: rc, border: `1px solid ${rc}2e`, fontFamily: "'Chakra Petch',sans-serif" }}>{row.ss}</span>
                           </td>
                         </tr>
