@@ -28,16 +28,18 @@
 #include <HTTPClient.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
 // ================================================================
 //  KONFIGURASI – SESUAIKAN SEBELUM UPLOAD
 // ================================================================
-const char* WIFI_SSID = "ITK-LAB2.X";
-const char* WIFI_PASS = "K@mpusM3rdeka!";
-const char* TB_HOST   = "9.154.230.7";  // Ganti jika self-hosted
+const char* WIFI_SSID = "BULEK";
+const char* WIFI_PASS = "KREDITHP";
+const char* TB_HOST   = "thingsboard.cloud";  // Ganti jika self-hosted
 const int   TB_PORT   = 1883;
 const int   TB_HTTP_PORT = 8080;
-const char* TB_TOKEN  = "TjNJpdXUPsPvjwaoJbGc"; // Device Access Token
+const char* TB_TOKEN  = "2DShRyoMO0tOSzyjMhkJ"; // Device Access Token
 
 // ================================================================
 //  PIN SENSOR (ADC1 – aman saat WiFi aktif)
@@ -62,7 +64,7 @@ static const float ADC_VREF = 3.3f;
 // ================================================================
 static const float PH_VOLT_AT7 = 2.42f;   // V → pH 7 (hasil kalibrasi)
 static const float PH_SLOPE    = 0.0592f; // 59.2 mV/pH
-static const float PH_OFFSET   = -7.0f;   // Sesuaikan jika perlu (±0.1–0.5)
+static const float PH_OFFSET   = 0.5f;   // Sesuaikan jika perlu (±0.1–0.5)
 
 // ================================================================
 //  KALIBRASI TDS – TDS Meter V1.0
@@ -102,6 +104,7 @@ static const unsigned long SEND_MS   = 2000;  // 2 detik
 // ================================================================
 WiFiClient   wifiCli;
 PubSubClient mqtt(wifiCli);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 unsigned long lastSent = 0;
 
 // ================================================================
@@ -400,6 +403,57 @@ void connectMQTT() {
   }
 }
 
+  void tampilLCD(const SensorData &s, const FuzzyOut &f)
+  {
+    static uint8_t page = 0;
+
+    lcd.clear();
+
+    switch(page)
+    {
+      case 0:
+        lcd.setCursor(0,0);
+        lcd.print("pH:");
+        lcd.print(s.ph,1);
+
+        lcd.setCursor(9,0);
+        lcd.print("TDS");
+        lcd.setCursor(9,1);
+        lcd.print((int)s.tds);
+
+        break;
+
+      case 1:
+        lcd.setCursor(0,0);
+        lcd.print("NTU:");
+        lcd.print(s.turb,1);
+
+        lcd.setCursor(0,1);
+        lcd.print("Score:");
+        lcd.print(f.score,0);
+
+        break;
+
+      default:
+        lcd.setCursor(0,0);
+        lcd.print("STATUS:");
+
+        lcd.setCursor(0,1);
+
+        if(f.level==2)
+          lcd.print("LAYAK");
+        else if(f.level==1)
+          lcd.print("PERLU TRT");
+        else
+          lcd.print("TIDAK LAYAK");
+
+        break;
+    }
+
+    page++;
+    if(page>2) page=0;
+  }
+
 // ================================================================
 //  KIRIM TELEMETRI KE THINGSBOARD
 // ================================================================
@@ -480,6 +534,17 @@ void sendTelemetry(const SensorData& s, const FuzzyOut& f) {
 // ================================================================
 void setup() {
   Serial.begin(115200);
+  Wire.begin(21,22);
+
+  lcd.init();
+  lcd.backlight();
+
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("MONITOR AIR");
+  lcd.setCursor(0,1);
+  lcd.print("Initializing...");
+  delay(2000);
   delay(500);
 
   Serial.println(F("\n╔══════════════════════════════════════════════╗"));
@@ -541,6 +606,7 @@ void loop() {
 
   // ── 2. Inferensi fuzzy ─────────────────────────────────────
   FuzzyOut f = fuzzyInfer(s.ph, s.tds, s.turb);
+  tampilLCD(s, f);
 
   // ── 3. Serial output ───────────────────────────────────────
   Serial.println(F("─────────────────────────────────────────────"));
