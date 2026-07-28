@@ -96,10 +96,11 @@ export function WaterSample({ph,ntu}){
   );
 }
 
-export function ParamBar({label,value,unit,color,max,okMin,okMax,warnMax}){
+export function ParamBar({label,value,unit,color,max,okMin,okMax,warnMax,decimals=1}){
   const ok=value>=(okMin??0)&&value<=(okMax??Infinity);
   const warn=!ok&&value<=(warnMax??Infinity);
   const sc=ok?T.ok:warn?T.warn:T.err;
+  const displayValue = Number(value).toFixed(decimals);
   return (
     <div style={{padding:'9px 0',borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'5px'}}>
@@ -107,7 +108,7 @@ export function ParamBar({label,value,unit,color,max,okMin,okMax,warnMax}){
           <span style={{fontSize:'10.5px',color:T.dim,letterSpacing:'1px',fontFamily:"'Chakra Petch',sans-serif"}}>{label}</span>
           <span style={{fontSize:'8px',color:sc,letterSpacing:'1.5px',padding:'1px 6px', background:`${sc}18`,border:`1px solid ${sc}30`,borderRadius:'10px'}}>{ok?'OK':warn?'WARN':'HIGH'}</span>
         </div>
-        <span style={{fontFamily:"'IBM Plex Mono',monospace",fontWeight:'700',fontSize:'13px', color,textShadow:`0 0 10px ${color}60`,transition:'color .3s'}}>{value} <span style={{fontSize:'9px',color:T.dim,fontWeight:'400'}}>{unit}</span></span>
+        <span style={{fontFamily:"'IBM Plex Mono',monospace",fontWeight:'700',fontSize:'13px', color,textShadow:`0 0 10px ${color}60`,transition:'color .3s'}}>{displayValue} <span style={{fontSize:'9px',color:T.dim,fontWeight:'400'}}>{unit}</span></span>
       </div>
       <div style={{height:'4px',background:'rgba(255,255,255,0.05)',borderRadius:'2px',overflow:'hidden'}}>
         <div style={{height:'100%',width:`${Math.min(100,(value/max)*100)}%`,borderRadius:'2px', background:`linear-gradient(90deg,${color}70,${color})`, boxShadow:`0 0 8px ${color}80`,transition:'width .55s ease-out'}}/>

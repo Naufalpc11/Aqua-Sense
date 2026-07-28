@@ -40,7 +40,7 @@ export default function AquaSense() {
   const upFmt = `${String(Math.floor(uptime / 3600)).padStart(2, '0')}:${String(Math.floor((uptime % 3600) / 60)).padStart(2, '0')}:${String(uptime % 60).padStart(2, '0')}`;
   const heroMetrics = [
     { l: 'pH', v: data.ph.toFixed(2), u: '', c: T.ph, ok: data.phOk },
-    { l: 'TDS', v: `${Math.round(data.tds)}`, u: 'ppm', c: T.tds, ok: data.tdsOk },
+    { l: 'TDS', v: data.tds.toFixed(1), u: 'ppm', c: T.tds, ok: data.tdsOk },
     { l: 'NTU', v: data.ntu.toFixed(1), u: '', c: T.ntu, ok: data.turbOk },
   ];
 
@@ -178,7 +178,7 @@ export default function AquaSense() {
               <WaterSample ph={data.ph} ntu={data.ntu} />
               <div>
                 <ParamBar label="pH" value={data.ph} unit="" color={T.ph} max={14} okMin={6.5} okMax={8.5} warnMax={9.5} />
-                <ParamBar label="TDS" value={data.tds} unit="ppm" color={T.tds} max={2000} okMin={0} okMax={500} warnMax={1000} />
+                <ParamBar label="TDS" value={data.tds} unit="ppm" color={T.tds} max={2000} okMin={0} okMax={500} warnMax={1000} decimals={1} />
                 <ParamBar label="NTU" value={data.ntu} unit="" color={T.ntu} max={1000} okMin={0} okMax={5} warnMax={100} />
               </div>
             </div>
@@ -226,7 +226,7 @@ export default function AquaSense() {
                         <tr key={`r-${i}-${i === 0 ? row.ts : i}`} className={`trh aqua-log-row${i === 0 ? ' nw-anim' : ''}`} style={{ borderBottom: '1px solid rgba(255,255,255,.03)', opacity: .62 + Math.max(0, 7 - i) * .055 }}>
                           <td data-label="WAKTU" style={{ padding: '7px 10px', color: 'rgba(200,232,245,.32)' }}>{row.ts}</td>
                           <td data-label="pH" style={{ padding: '7px 10px', color: T.ph, fontWeight: '600' }}>{row.ph.toFixed(2)}</td>
-                          <td data-label="TDS (ppm)" style={{ padding: '7px 10px', color: T.tds, fontWeight: '600' }}>{row.tds}</td>
+                          <td data-label="TDS (ppm)" style={{ padding: '7px 10px', color: T.tds, fontWeight: '600' }}>{Number(row.tds).toFixed(1)}</td>
                           <td data-label="TURB (NTU)" style={{ padding: '7px 10px', color: T.ntu, fontWeight: '600' }}>{row.ntu.toFixed(1)}</td>
                           <td data-label="FUZZY SCORE" style={{ padding: '7px 10px', color: rc, fontWeight: '700' }}>{row.score.toFixed(1)}</td>
                           <td data-label="STATUS" style={{ padding: '7px 10px' }}>
