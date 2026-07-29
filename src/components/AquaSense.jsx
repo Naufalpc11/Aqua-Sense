@@ -13,6 +13,31 @@ import '../styles/AquaSense.css';
 export default function AquaSense() {
   const { data, hist, log, connection, pollMs } = useTelemetry();
   const [now, setNow] = useState(() => new Date());
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async (format) => {
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/telemetry/export?format=${format}`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error('Export gagal');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `aquasense-${new Date().toISOString().slice(0, 10)}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Export error:', err);
+      alert('Gagal mengexport data: ' + err.message);
+    } finally {
+      setExporting(false);
+    }
+  };
   const [uptime, setUptime] = useState(0);
 
   useEffect(() => {
@@ -75,10 +100,33 @@ export default function AquaSense() {
               <div className="aqua-separator" style={{ height: '18px', width: '1px', background: 'rgba(255,255,255,.06)' }} />
               <div className="aqua-clock" style={{ fontSize: '12px', color: 'rgba(200,232,245,.45)', fontFamily: "'IBM Plex Mono',monospace" }}>{now.toLocaleTimeString('id-ID')}</div>
               <div className="aqua-separator" style={{ height: '18px', width: '1px', background: 'rgba(255,255,255,.06)' }} />
-              <div className="aqua-badges" style={{ display: 'flex', gap: '7px' }}>
+              <div className="aqua-badges" style={{ display: 'flex', gap: '7px', alignItems: 'center' }}>
                 {[['KIC 2026', true], ['PROTOTYPE', false]].map(([b, hi]) => (
                   <div key={b} style={{ padding: '4px 11px', borderRadius: '20px', fontSize: '9px', letterSpacing: '1.5px', background: hi ? 'rgba(0,245,228,.1)' : 'rgba(255,255,255,.04)', color: hi ? T.accent : 'rgba(200,232,245,.38)', border: `1px solid ${hi ? 'rgba(0,245,228,.3)' : 'rgba(255,255,255,.08)'}` }}>{b}</div>
                 ))}
+                <div className="aqua-separator" style={{ height: '18px', width: '1px', background: 'rgba(255,255,255,.06)' }} />
+                <button
+                  onClick={() => handleExport('csv')}
+                  disabled={exporting}
+                  title="Download data historis sebagai CSV (bisa dibuka Excel)"
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '9px',
+                    letterSpacing: '1.5px',
+                    background: exporting ? 'rgba(0,245,228,.05)' : 'rgba(0,245,228,.1)',
+                    color: exporting ? 'rgba(200,232,245,.3)' : T.accent,
+                    border: `1px solid ${exporting ? 'rgba(0,245,228,.1)' : 'rgba(0,245,228,.3)'}`,
+                    cursor: exporting ? 'not-allowed' : 'pointer',
+                    fontFamily: "'Chakra Petch',sans-serif",
+                    transition: 'all .2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  {exporting ? '⏳' : '⬇'} EXPORT CSV
+                </button>
               </div>
             </div>
           </div>

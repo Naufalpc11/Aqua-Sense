@@ -3,6 +3,8 @@ import {
   getDeviceId,
   thingsBoardRequest,
 } from './thingsboard-client.js';
+import { saveTelemetryPoint } from './data-service.js';
+import { saveTelemetryToSupabase } from './supabase-service.js';
 
 const LATEST_CACHE_MS = 500;
 const HISTORY_CACHE_MS = 5000;
@@ -162,6 +164,11 @@ export async function getLatestTelemetry() {
       turbOk: asBoolean(latestValue(series, 'turb_ok')),
     },
   };
+
+  // Auto-save ke JSON file storage lokal
+  saveTelemetryPoint(result.telemetry);
+  // Auto-save ke Supabase (online, aman untuk Vercel)
+  saveTelemetryToSupabase(result.telemetry);
 
   latestCache = {
     value: result,
