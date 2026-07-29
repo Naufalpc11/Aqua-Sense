@@ -1,19 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Konstanta dari environment
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || '';
 const TABLE_NAME = 'telemetry';
 
 let supabase = null;
 
 function getClient() {
   if (!supabase) {
-    if (!SUPABASE_URL || !SUPABASE_KEY) {
+    const url = process.env.SUPABASE_URL || '';
+    const key = process.env.SUPABASE_KEY || '';
+    if (!url || !key) {
       console.warn('⚠️  Supabase belum dikonfigurasi. Data hanya disimpan di file lokal.');
       return null;
     }
-    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+    supabase = createClient(url, key);
   }
   return supabase;
 }

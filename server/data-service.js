@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const DATA_DIR = join(import.meta.dirname, '..', 'data');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const DATA_DIR = join(__dirname, '..', 'data');
 const SAVE_INTERVAL_MS = 5000; // simpan setiap 5 detik
 const MAX_POINTS_PER_FILE = 50000; // max 50rb titik per file
 
