@@ -103,25 +103,32 @@ export async function getHistoryFromSupabase({ date, limit = 50000 } = {}) {
   }
 }
 
-function formatTimestamp(ts) {
+function toWIB(ts) {
   const d = new Date(ts);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  const s = String(d.getSeconds()).padStart(2, '0');
+  const offset = 7 * 60 * 60 * 1000; // WIB = UTC+7 dalam milidetik
+  return new Date(d.getTime() + offset);
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return '';
+  const d = toWIB(ts);
+  const y = d.getUTCFullYear();
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const h = String(d.getUTCHours()).padStart(2, '0');
+  const mi = String(d.getUTCMinutes()).padStart(2, '0');
+  const s = String(d.getUTCSeconds()).padStart(2, '0');
   return `${y}-${mo}-${day} ${h}:${mi}:${s}`;
 }
 
 function formatISO(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  const s = String(d.getSeconds()).padStart(2, '0');
+  const d = toWIB(iso);
+  const y = d.getUTCFullYear();
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(d.getUTCDate()).padStart(2, '0');
+  const h = String(d.getUTCHours()).padStart(2, '0');
+  const mi = String(d.getUTCMinutes()).padStart(2, '0');
+  const s = String(d.getUTCSeconds()).padStart(2, '0');
   return `${y}-${mo}-${day} ${h}:${mi}:${s}`;
 }

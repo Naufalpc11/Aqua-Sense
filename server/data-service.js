@@ -62,12 +62,15 @@ function scheduleFlush() {
  */
 function formatTime(ts) {
   const d = new Date(ts);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  const s = String(d.getSeconds()).padStart(2, '0');
+  // Paksa ke WIB (UTC+7) biar konsisten di server manapun
+  const offset = 7 * 60; // WIB = UTC+7 dalam menit
+  const wib = new Date(d.getTime() + offset * 60 * 1000);
+  const y = wib.getUTCFullYear();
+  const mo = String(wib.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(wib.getUTCDate()).padStart(2, '0');
+  const h = String(wib.getUTCHours()).padStart(2, '0');
+  const mi = String(wib.getUTCMinutes()).padStart(2, '0');
+  const s = String(wib.getUTCSeconds()).padStart(2, '0');
   return `${y}-${mo}-${day} ${h}:${mi}:${s}`;
 }
 
