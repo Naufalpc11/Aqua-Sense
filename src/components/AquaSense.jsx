@@ -14,6 +14,31 @@ export default function AquaSense() {
   const { data, hist, log, connection, pollMs } = useTelemetry();
   const [now, setNow] = useState(() => new Date());
   const [exporting, setExporting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleReset = async () => {
+    const token = prompt('Masukkan token reset data:');
+    if (!token) return;
+
+    if (!confirm('Yakin mau hapus SEMUA data telemetry di Supabase? Data yang sudah dihapus tidak bisa dikembalikan!')) return;
+
+    setResetting(true);
+    try {
+      const res = await fetch(`/api/telemetry/reset?token=${encodeURIComponent(token)}`, {
+        method: 'POST',
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || 'Reset gagal');
+      alert('✅ ' + result.message);
+      // Refresh halaman biar graph & log kosong
+      window.location.reload();
+    } catch (err) {
+      console.error('Reset error:', err);
+      alert('❌ Gagal reset: ' + err.message);
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleExport = async (format) => {
     setExporting(true);
@@ -126,6 +151,28 @@ export default function AquaSense() {
                   }}
                 >
                   {exporting ? '⏳' : '⬇'} EXPORT CSV
+                </button>
+                <button
+                  onClick={handleReset}
+                  disabled={resetting}
+                  title="Hapus semua data telemetry di Supabase"
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                    fontSize: '9px',
+                    letterSpacing: '1.5px',
+                    background: resetting ? 'rgba(255,80,80,.05)' : 'rgba(255,80,80,.1)',
+                    color: resetting ? 'rgba(200,232,245,.3)' : '#ff5050',
+                    border: `1px solid ${resetting ? 'rgba(255,80,80,.1)' : 'rgba(255,80,80,.3)'}`,
+                    cursor: resetting ? 'not-allowed' : 'pointer',
+                    fontFamily: "'Chakra Petch',sans-serif",
+                    transition: 'all .2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                  }}
+                >
+                  {resetting ? '⏳' : '🗑'} RESET
                 </button>
               </div>
             </div>

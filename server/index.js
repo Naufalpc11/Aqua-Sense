@@ -14,7 +14,7 @@ import {
   flushPending,
   listDataFiles,
 } from './data-service.js';
-import { getHistoryFromSupabase } from './supabase-service.js';
+import { getHistoryFromSupabase, resetTelemetryInSupabase } from './supabase-service.js';
 
 function errorMessage(error, fallback) {
   return error instanceof Error ? error.message : fallback;
@@ -100,6 +100,24 @@ const server = createServer(async (request, response) => {
         connected: false,
         message: errorMessage(error, 'Riwayat telemetry tidak tersedia'),
       });
+    }
+    return;
+  }
+
+  if (request.method === 'POST' && pathname === '/api/telemetry/reset') {
+    const token = requestUrl.searchParams.get('token') || '';
+    const expectedToken = process.env.RESET_TOKEN || '';
+
+    if (!expectedToken || token !== expectedToken) {
+      sendJson(response, 403, { success: false, message: 'Token reset tidak valid' });
+      return;
+    }
+
+    try {
+      const result = await resetTelemetryInSupabase();
+      sendJson(response, 200, result);
+    } catch (error) {
+      sendJson(response, 503, { success: false, message: errorMessage(error, 'Reset gagal') });
     }
     return;
   }

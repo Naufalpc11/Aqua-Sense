@@ -103,6 +103,25 @@ export async function getHistoryFromSupabase({ date, limit = 50000 } = {}) {
   }
 }
 
+/**
+ * Hapus semua data telemetry dari Supabase.
+ * Dipanggil dari endpoint reset yang protected dengan token.
+ */
+export async function resetTelemetryInSupabase() {
+  const client = getClient();
+  if (!client) return { success: false, message: 'Supabase belum dikonfigurasi' };
+
+  try {
+    const { error } = await client.from(TABLE_NAME).delete().neq('id', 0);
+    if (error) {
+      return { success: false, message: error.message };
+    }
+    return { success: true, message: 'Semua data telemetry berhasil dihapus' };
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+}
+
 function toWIB(ts) {
   const d = new Date(ts);
   const offset = 7 * 60 * 60 * 1000; // WIB = UTC+7 dalam milidetik
