@@ -38,6 +38,7 @@ const HISTORY_KEYS = [
 
 let latestCache = { expiresAt: 0, value: null };
 const historyCache = new Map();
+let lastSavedTimestamp = 0; // Track timestamp terakhir yang disimpan ke Supabase
 
 function latestValue(series, key) {
   return series[key]?.[0]?.value;
@@ -167,8 +168,11 @@ export async function getLatestTelemetry() {
 
   // Auto-save ke JSON file storage lokal
   saveTelemetryPoint(result.telemetry);
-  // Auto-save ke Supabase (online, aman untuk Vercel)
-  saveTelemetryToSupabase(result.telemetry);
+  // Auto-save ke Supabase hanya kalau timestamp baru (bukan duplikat)
+  if (timestamp !== lastSavedTimestamp) {
+    lastSavedTimestamp = timestamp;
+    saveTelemetryToSupabase(result.telemetry);
+  }
 
   latestCache = {
     value: result,
