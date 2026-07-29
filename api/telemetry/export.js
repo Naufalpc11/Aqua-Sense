@@ -4,18 +4,6 @@ function sendJson(response, status, data) {
   response.status(status).json(data);
 }
 
-function formatTimestamp(ts) {
-  if (!ts) return '';
-  const d = new Date(ts);
-  const y = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  const h = String(d.getHours()).padStart(2, '0');
-  const mi = String(d.getMinutes()).padStart(2, '0');
-  const s = String(d.getSeconds()).padStart(2, '0');
-  return `${y}-${mo}-${day} ${h}:${mi}:${s}`;
-}
-
 export default async function handler(request, response) {
   if (request.method !== 'GET') {
     sendJson(response, 405, { message: 'Method not allowed' });
