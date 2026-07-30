@@ -3,7 +3,6 @@ import {
   getDeviceId,
   thingsBoardRequest,
 } from './thingsboard-client.js';
-import { saveTelemetryPoint } from './data-service.js';
 import { saveTelemetryToSupabase } from './supabase-service.js';
 
 const LATEST_CACHE_MS = 500;
@@ -166,8 +165,6 @@ export async function getLatestTelemetry() {
     },
   };
 
-  // Auto-save ke JSON file storage lokal
-  saveTelemetryPoint(result.telemetry);
   // Auto-save ke Supabase hanya kalau timestamp baru (bukan duplikat)
   if (timestamp !== lastSavedTimestamp) {
     lastSavedTimestamp = timestamp;

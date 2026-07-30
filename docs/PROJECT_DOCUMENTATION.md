@@ -38,10 +38,28 @@ ThingsBoard
   v
 Node.js API bridge
   |
-  | /api/telemetry/latest dan /api/telemetry/history
+  ├── /api/telemetry/latest dan /api/telemetry/history
+  ├── /api/telemetry/export   (CSV/JSON download)
+  ├── /api/telemetry/reset    (hapus data Supabase)
+  └── /api/telemetry/files    (daftar file JSON lokal)
+  |
   v
 React dashboard
 ```
+
+### Dual Storage (Supabase + JSON Lokal)
+
+Setiap data telemetry yang diambil dari ThingsBoard disimpan ke **dua tempat**:
+
+```
+Node API
+   |
+   ├── JSON file (lokal) → folder data/telemetry-YYYY-MM-DD.json
+   └── Supabase (cloud)  → table telemetry (untuk Vercel/production)
+```
+
+- **JSON file**: backup lokal, tetap jalan walau tanpa Supabase.
+- **Supabase**: untuk export CSV/JSON di Vercel / production.
 
 ## 2. Tujuan Setiap Lapisan
 
@@ -50,7 +68,7 @@ React dashboard
 | Sensor | Menghasilkan sinyal analog pH, TDS, dan turbiditas |
 | ESP32 | Sampling ADC, kalibrasi, fuzzy, serial debug, pengiriman telemetry |
 | ThingsBoard | Menyimpan latest telemetry dan histori time-series |
-| Node API | Login tenant, mengambil telemetry, normalisasi data, cache, dan static hosting |
+| Node API | Login tenant, mengambil telemetry, normalisasi data, cache, static hosting, auto-save ke Supabase & JSON file |
 | React | Menampilkan status, gauge, grafik, visualisasi air, dan log |
 
 Pemisahan ini penting karena:
@@ -96,6 +114,7 @@ dan `ArduinoJson` dikelola oleh PlatformIO melalui `platformio.ini`.
 | Recharts | `^3.8.1` | Grafik time-series |
 | Vite | `^8.0.12` | Dev server dan build frontend |
 | ESLint | `^10.3.0` | Pemeriksaan kode JavaScript/JSX |
+| **@supabase/supabase-js** | latest | Client Supabase untuk cloud storage |
 
 Backend hanya memakai modul bawaan Node.js dan global `fetch`. Tidak ada
 framework Express.
@@ -107,47 +126,54 @@ aquasense/
 |-- .env
 |-- .env.example
 |-- .gitignore
-|-- .pio/
-|-- .vscode/
-|-- dist/
+|-- data/
+|   `-- telemetry-2026-07-29.json     (auto-generated, di-gitignore)
 |-- docs/
 |   |-- PROJECT_DOCUMENTATION.md
-|   `-- THINGSBOARD_SETUP.md
+|   |-- THINGSBOARD_SETUP.md
+|   |-- SUPABASE_SETUP.md
+|   |-- VERCEL_DEPLOYMENT.md
+|   `-- PENJELASAN_FRAMEWORK.md
 |-- firmware/
 |   `-- main.cpp
-|-- node_modules/
 |-- public/
 |   |-- favicon.svg
 |   `-- icons.svg
+|-- api/                               (Vercel serverless functions)
+|   |-- health.js
+|   `-- telemetry/
+|       |-- export.js
+|       |-- history.js
+|       `-- reset.js
 |-- server/
 |   |-- config.js
+|   |-- data-service.js               (JSON file storage)
 |   |-- http-utils.js
 |   |-- index.js
+|   |-- supabase-service.js           (Supabase cloud storage)
 |   |-- telemetry-service.js
 |   `-- thingsboard-client.js
 |-- src/
-|   |-- assets/
-|   |   |-- hero.png
-|   |   |-- react.svg
-|   |   `-- vite.svg
 |   |-- components/
 |   |   |-- ui/
 |   |   |   `-- Widgets.jsx
-|   |   `-- AquaSense.jsx
+|   |   |-- AquaSense.jsx             (komposisi utama)
+|   |   |-- Header.jsx                (header + export/reset)
+|   |   |-- StatusHero.jsx            (status kualitas air)
+|   |   |-- GaugeRow.jsx              (gauge sensor)
+|   |   |-- ChartRow.jsx              (grafik + visualisasi)
+|   |   `-- FlowLogRow.jsx            (diagram alur + log)
 |   |-- hooks/
 |   |   `-- useTelemetry.js
 |   |-- styles/
 |   |   `-- AquaSense.css
 |   |-- utils/
 |   |   `-- theme.js
-|   |-- App.css
 |   |-- App.jsx
-|   |-- index.css
 |   |-- main.jsx
 |   `-- monitor_air_asam_tambang.ino
 |-- eslint.config.js
 |-- index.html
-|-- package-lock.json
 |-- package.json
 |-- platformio.ini
 |-- README.md
@@ -161,17 +187,17 @@ aquasense/
 | `firmware/` | Entry point yang dikenali PlatformIO |
 | `src/` | Firmware asli dan source code dashboard React |
 | `server/` | API lokal yang menghubungkan dashboard ke ThingsBoard |
+| `api/` | Serverless functions untuk deployment Vercel |
 | `public/` | File statis yang disalin Vite tanpa pemrosesan |
-| `docs/` | Dokumentasi proyek dan panduan ThingsBoard |
+| `docs/` | Dokumentasi proyek dan panduan |
+| `data/` | File JSON telemetry lokal (di-gitignore) |
 
 ### 4.2 Folder hasil generate
 
 | Folder | Dibuat oleh | Keterangan |
 | --- | --- | --- |
-| `.pio/` | PlatformIO | Object, library, dan hasil build firmware |
 | `node_modules/` | npm | Dependency JavaScript lokal |
 | `dist/` | Vite | Hasil build frontend untuk mode produksi |
-| `.vscode/` | VS Code/PlatformIO | Konfigurasi editor dan extension |
 
 Folder generate tidak berisi logika bisnis utama dan umumnya tidak perlu
 diedit manual.
@@ -219,7 +245,7 @@ Dengan pola ini:
 
 #### `server/index.js`
 
-Entry point backend yang sekarang hanya menangani:
+Entry point backend yang menangani:
 
 1. Membuat HTTP server.
 2. Mendefinisikan route API.
@@ -234,6 +260,9 @@ Endpoint yang tersedia:
 | `GET` | `/api/health` | Memeriksa server dan kelengkapan konfigurasi |
 | `GET` | `/api/telemetry/latest` | Mengambil telemetry terbaru |
 | `GET` | `/api/telemetry/history` | Mengambil histori time-series |
+| `GET` | `/api/telemetry/export` | Download data sebagai CSV/JSON |
+| `POST` | `/api/telemetry/reset` | Hapus semua data di Supabase (protected token) |
+| `GET` | `/api/telemetry/files` | Daftar file JSON lokal yang tersedia |
 
 #### `server/config.js`
 
@@ -260,12 +289,51 @@ Menangani logika data telemetry:
 - Pengambilan dan penggabungan histori.
 - Dedup burst telemetry.
 - Cache latest 500 ms dan history 5 detik.
+- Auto-save ke JSON file lokal dan Supabase (hanya saat timestamp baru).
+
+#### `server/data-service.js`
+
+Menyimpan data telemetry ke file JSON lokal:
+
+- Buffer data di memory, flush ke disk setiap 5 detik.
+- Rotasi file per hari (`telemetry-YYYY-MM-DD.json`).
+- Maksimal 50.000 titik per file.
+- Menyediakan fungsi untuk membaca dan menggabungkan data dari file.
+- Format timestamp menggunakan WIB (UTC+7).
+
+#### `server/supabase-service.js`
+
+Menghubungkan ke Supabase untuk cloud storage:
+
+- Membuat client Supabase dari environment variable.
+- `saveTelemetryToSupabase(point)` — insert data ke tabel `telemetry`.
+- `getHistoryFromSupabase({ date, limit })` — baca data historis.
+- `resetTelemetryInSupabase()` — hapus semua data (dipanggil dari endpoint reset).
+- Format timestamp menggunakan WIB (UTC+7).
 
 #### `server/http-utils.js`
 
 Berisi helper respons JSON dan penyajian file statis dari folder `dist/`.
 
-### 5.3 File frontend
+### 5.3 File Vercel serverless
+
+#### `api/health.js`
+
+Serverless function untuk health check di Vercel.
+
+#### `api/telemetry/history.js`
+
+Serverless function untuk mengambil histori telemetry dari ThingsBoard di Vercel.
+
+#### `api/telemetry/export.js`
+
+Serverless function untuk export CSV/JSON dari Supabase di Vercel.
+
+#### `api/telemetry/reset.js`
+
+Serverless function untuk reset data Supabase di Vercel (protected dengan token).
+
+### 5.4 File frontend
 
 #### `src/main.jsx`
 
@@ -286,20 +354,59 @@ Komponen root yang hanya merender komponen utama:
 
 #### `src/components/AquaSense.jsx`
 
-Komponen dashboard utama. Tanggung jawabnya:
+Komposisi utama dashboard. Sekarang hanya berisi layout dan komposisi
+komponen yang sudah dipecah:
 
-- Memanggil hook `useTelemetry()`.
-- Menampilkan status koneksi.
-- Menampilkan status kualitas air dan rekomendasi.
-- Menampilkan gauge pH, TDS, NTU, dan fuzzy score.
-- Menampilkan grafik Recharts.
-- Menampilkan visualisasi sampel air.
-- Menampilkan diagram proses bio-filtrasi.
-- Menampilkan delapan log sensor terbaru.
-- Menampilkan jam browser dan uptime halaman.
+- `Header` — Header + tombol Export & Reset.
+- `StatusHero` — Status kualitas air dan metrics.
+- `GaugeRow` — Gauge pH, TDS, NTU, dan Fuzzy Score.
+- `ChartRow` — Grafik Recharts + visualisasi sampel air.
+- `FlowLogRow` — Diagram alur bio-filtrasi + tabel log.
 
-`uptime` pada header adalah lama halaman dashboard dibuka, bukan uptime
-ESP32.
+#### `src/components/Header.jsx`
+
+Komponen header sticky. Tanggung jawabnya:
+
+- Menampilkan brand AquaSense.
+- Status koneksi (LIVE/STALE/OFFLINE/CONNECTING).
+- Jam browser dan uptime halaman.
+- Badge KIC 2026 & PROTOTYPE.
+- Tombol **EXPORT CSV** (download data historis).
+- Tombol **RESET** (hapus data Supabase, butuh token).
+
+#### `src/components/StatusHero.jsx`
+
+Menampilkan status kualitas air utama:
+
+- Indikator status dengan animasi pulse.
+- Status kualitas air (LAYAK / PERLU TREATMENT / TIDAK LAYAK).
+- Rekomendasi tindakan.
+- Metrics singkat pH, TDS, NTU dengan indikator OK/WARN.
+
+#### `src/components/GaugeRow.jsx`
+
+Menampilkan gauge sensor:
+
+- 3 gauge sensor (pH, TDS, NTU) menggunakan `ArcGauge`.
+- 1 gauge Fuzzy Score menggunakan `ScoreRing`.
+- Status per parameter (OK/WARN/ERROR).
+
+#### `src/components/ChartRow.jsx`
+
+Menampilkan grafik dan visualisasi sampel air:
+
+- Grafik time-series 4 seri (pH, TDS, NTU, Fuzzy Score) menggunakan Recharts.
+- 4 YAxis terpisah agar skala tidak saling memengaruhi.
+- Visualisasi sampel air (`WaterSample`).
+- Progress bar per parameter (`ParamBar`).
+
+#### `src/components/FlowLogRow.jsx`
+
+Menampilkan diagram alur dan tabel log:
+
+- Diagram proses bio-filtrasi (`FlowDiagram`).
+- Spesifikasi sistem (ESP32, Fuzzy Logic, ThingsBoard, dll).
+- Tabel log 8 baris terakhir dengan animasi baris baru.
 
 #### `src/components/ui/Widgets.jsx`
 
@@ -349,10 +456,6 @@ Menyimpan palet warna global:
 - Ungu untuk fuzzy.
 - Hijau, kuning, dan merah untuk status.
 
-#### `src/index.css`
-
-File ini diimpor oleh `src/main.jsx`, tetapi saat ini kosong.
-
 #### `src/styles/AquaSense.css`
 
 File style aktif yang diimpor oleh `AquaSense.jsx`. Isinya:
@@ -364,11 +467,7 @@ File style aktif yang diimpor oleh `AquaSense.jsx`. Isinya:
 - Style dasar kartu dan hover tabel.
 - Class `.card`, `.pls`, `.flt`, `.trh`, dan `.nw-anim`.
 
-#### `src/App.css`
-
-File template yang saat ini kosong dan tidak diimpor oleh aplikasi.
-
-### 5.4 File konfigurasi
+### 5.5 File konfigurasi
 
 #### `platformio.ini`
 
@@ -412,11 +511,6 @@ Mendefinisikan dependency dan script npm:
 | `npm run lint` | `eslint .` | Memeriksa JavaScript dan JSX |
 | `npm run preview` | `vite preview` | Preview hasil build Vite |
 
-#### `package-lock.json`
-
-Mengunci versi dependency npm beserta dependency turunannya agar instalasi
-lebih konsisten antar komputer.
-
 #### `vite.config.js`
 
 Mengaktifkan plugin React dan proxy development:
@@ -436,7 +530,7 @@ Mengaktifkan:
 - Rule React Hooks.
 - Rule React Refresh untuk Vite.
 - Global browser untuk frontend.
-- Global Node untuk file di `server/`.
+- Global Node untuk file di `server/` dan `api/`.
 - Pengabaian folder `dist/`.
 
 #### `.env.example`
@@ -450,6 +544,9 @@ Template konfigurasi Node API. Variabelnya:
 | `TB_PASSWORD` | Password akun tenant |
 | `TB_DEVICE_ID` | UUID device, pilihan utama |
 | `TB_DEVICE_NAME` | Fallback pencarian device berdasarkan nama |
+| `SUPABASE_URL` | URL project Supabase (untuk cloud storage) |
+| `SUPABASE_KEY` | Anon public key Supabase |
+| `RESET_TOKEN` | Token rahasia untuk endpoint reset data |
 | `API_PORT` | Port Node API, default 3001 |
 | `TB_STALE_AFTER_MS` | Batas umur data sebelum device dianggap stale |
 
@@ -469,57 +566,9 @@ Mengabaikan file hasil generate dan rahasia seperti:
 - `dist`
 - `.env`
 - `.pio`
+- `data/` (folder data telemetry lokal)
 - log
 - sebagian konfigurasi editor
-
-### 5.5 File HTML, public, dan aset
-
-#### `index.html`
-
-Shell HTML Vite yang:
-
-- Menentukan favicon.
-- Menyediakan elemen `<div id="root">`.
-- Memuat `/src/main.jsx`.
-
-#### `public/favicon.svg`
-
-Favicon browser yang saat ini berasal dari aset default/template.
-
-#### `public/icons.svg`
-
-Sprite SVG berisi beberapa ikon sosial dan dokumentasi. File ini belum
-dipakai oleh dashboard saat ini.
-
-#### `src/assets/hero.png`
-
-Aset gambar yang belum diimpor oleh komponen aktif.
-
-#### `src/assets/react.svg` dan `src/assets/vite.svg`
-
-Aset bawaan template React/Vite yang tidak digunakan oleh dashboard aktif.
-
-### 5.6 File dokumentasi
-
-#### `README.md`
-
-Panduan operasional singkat:
-
-- Menyiapkan firmware.
-- Build dan upload ESP32.
-- Membuka Serial Monitor.
-- Menjalankan backend dan frontend.
-- Menjalankan mode produksi.
-- Memeriksa interval dan grafik.
-
-#### `docs/THINGSBOARD_SETUP.md`
-
-Panduan khusus konfigurasi ThingsBoard, device, telemetry, dan dashboard
-ThingsBoard.
-
-#### `docs/PROJECT_DOCUMENTATION.md`
-
-Dokumen arsitektur dan penjelasan source code yang sedang dibaca ini.
 
 ## 6. Konfigurasi Hardware dan ADC
 
@@ -654,10 +703,6 @@ Konsekuensinya:
 - Perubahan kecil pada tegangan dapat menghasilkan perubahan NTU besar karena
   rentang kalibrasinya hanya 0.18 V.
 
-Komentar lama di firmware masih membahas rasio voltage divider dan contoh
-4.2 V, tetapi implementasi aktif langsung menggunakan tegangan ADC dengan
-batas `1.67 V` dan `1.49 V`.
-
 ## 8. Logika Fuzzy
 
 ### 8.1 Posisi fuzzy dalam sistem
@@ -697,9 +742,6 @@ Perilakunya:
 | `pN` | Netral | `[5.5, 6.5, 7.5, 9]` |
 | `pB` | Basa | `[7.5, 9, 14, 14]` |
 
-Rentang saling tumpang tindih. Satu nilai pH dapat memiliki derajat
-keanggotaan pada lebih dari satu kategori.
-
 ### 8.4 Himpunan TDS
 
 | Kode | Nama | Parameter trapesium, ppm |
@@ -718,10 +760,6 @@ keanggotaan pada lebih dari satu kategori.
 | `nK` | Keruh | `[50, 100, 250, 500]` |
 | `nSK` | Sangat Keruh | `[300, 600, 3000, 3000]` |
 
-Walaupun konversi sensor dibatasi maksimal 1000 NTU, himpunan `nSK`
-didefinisikan sampai 3000 NTU. Pada input perangkat saat ini, bagian di atas
-1000 tidak pernah tercapai.
-
 ### 8.6 Operator fuzzy
 
 Operator AND menggunakan nilai minimum:
@@ -739,8 +777,7 @@ wt += strength
 
 ### 8.7 Daftar 33 aturan
 
-Implementasi aktual memiliki 33 pemanggilan aturan. Beberapa banner dan
-komentar lama di file `.ino` masih menulis 30 rules.
+Implementasi aktual memiliki 33 pemanggilan aturan.
 
 #### Kelompok 1: Layak, 4 aturan
 
@@ -811,11 +848,6 @@ score = 50
 
 Skor kemudian dibatasi ke `0 sampai 100`.
 
-Firmware menyebut pendekatan ini "Mamdani + Weighted Average". Secara teknis,
-konsekuen setiap aturan pada kode adalah nilai singleton dan hasil akhirnya
-weighted average, bukan centroid dari kurva output Mamdani kontinu. Dokumen
-ini mengikuti perilaku implementasi aktual.
-
 ### 8.9 Klasifikasi output
 
 | Score | Level | Label | Rekomendasi |
@@ -823,10 +855,6 @@ ini mengikuti perilaku implementasi aktual.
 | `>= 70` | 2 | `LAYAK` | Air layak digunakan |
 | `>= 40` dan `< 70` | 1 | `PERLU_TREATMENT` | Netralisasi/filtrasi sebelum digunakan |
 | `< 40` | 0 | `TIDAK_LAYAK` | Pengolahan intensif diperlukan |
-
-Karena beberapa aturan dapat aktif bersamaan, score akhir dapat berbeda dari
-nilai singleton salah satu aturan. Nilainya merupakan rata-rata berbobot dari
-semua aturan aktif.
 
 ## 9. Alur Firmware
 
@@ -895,13 +923,8 @@ Urutannya:
 1. Firmware mencoba HTTP POST.
 2. Status HTTP `200 sampai 299` dianggap berhasil.
 3. Jika HTTP gagal, firmware mencoba satu koneksi MQTT singkat.
-4. Jika MQTT tersambung, payload dipublish ke
-   `v1/devices/me/telemetry`.
+4. Jika MQTT tersambung, payload dipublish ke `v1/devices/me/telemetry`.
 5. Hasil dan payload dicetak ke Serial Monitor.
-
-Fungsi `connectMQTT()` yang melakukan beberapa retry masih tersedia, tetapi
-tidak dipanggil pada alur normal. Fallback memakai koneksi MQTT langsung satu
-kali agar loop tidak tertahan lama.
 
 ## 10. Kontrak Telemetry
 
@@ -934,10 +957,7 @@ Kategori `ph_kategori`:
 | pH `<= 9.5` | `BASA_RINGAN` |
 | Selain itu | `SANGAT_BASA` |
 
-Flag `ph_ok`, `tds_ok`, dan `turb_ok` adalah pemeriksaan ambang individual.
-Status fuzzy tetap ditentukan oleh score hasil kombinasi aturan.
-
-Contoh bentuk payload tanpa credential:
+Contoh bentuk payload:
 
 ```json
 {
@@ -989,15 +1009,7 @@ Urutan pencarian:
 2. Jika kosong, cari device berdasarkan `TB_DEVICE_NAME`.
 3. Simpan ID yang sudah ditemukan dalam memori agar tidak dicari berulang.
 
-UUID device lebih disarankan karena tidak berubah ketika nama device diedit.
-
 ### 11.4 Latest telemetry
-
-Endpoint internal ThingsBoard yang dipakai:
-
-```text
-/api/plugins/telemetry/DEVICE/{deviceId}/values/timeseries?keys=...
-```
 
 Server:
 
@@ -1007,6 +1019,8 @@ Server:
 4. Mengubah label firmware menjadi label UI.
 5. Menghitung apakah device masih online.
 6. Menyimpan hasil dalam cache selama 500 ms.
+7. **Auto-save ke JSON file lokal** (via `data-service.js`).
+8. **Auto-save ke Supabase** (hanya jika timestamp berbeda dari sebelumnya).
 
 Penentuan online:
 
@@ -1047,10 +1061,36 @@ Kemudian:
 5. Menyisakan maksimal jumlah `limit`.
 6. Menyimpan hasil dalam cache 5 detik.
 
-Dedup burst membantu ketika restart atau reconnect menghasilkan beberapa
-telemetry dalam waktu sangat dekat.
+### 11.6 Export telemetry (CSV/JSON)
 
-### 11.6 Static production server
+Endpoint: `GET /api/telemetry/export?format=csv&date=2026-07-29`
+
+- `format`: `csv` atau `json` (default `json`).
+- `date`: filter per tanggal (format `YYYY-MM-DD`), kosongkan untuk semua data.
+
+Alur:
+
+1. Flush data pending di buffer JSON file.
+2. Coba ambil data dari **Supabase** terlebih dahulu.
+3. Jika Supabase belum dikonfigurasi atau kosong, fallback ke **file JSON lokal**.
+4. Format CSV menggunakan WIB (UTC+7) dengan BOM UTF-8 agar kompatibel Excel.
+
+Kolom CSV:
+
+```text
+waktu,sensor_ph,tds_ppm,turbidity_ntu,fuzzy_score,level,status,phCategory,phOk,tdsOk,turbOk,tersimpan_pada
+```
+
+### 11.7 Reset data
+
+Endpoint: `POST /api/telemetry/reset?token=RAHASIA`
+
+- Method: `POST`.
+- Parameter: `token` (harus sama dengan `RESET_TOKEN` di `.env`).
+- Fungsi: Menghapus semua data di tabel `telemetry` Supabase.
+- Aman: tidak bisa diakses tanpa token yang benar.
+
+### 11.8 Static production server
 
 Jika folder `dist/` ada, Node juga menyajikan:
 
@@ -1149,13 +1189,6 @@ Saat tab tersembunyi:
 1 request setiap 10000 ms
 ```
 
-Tidak ada request baru jika request sebelumnya masih berjalan. Karena timer
-baru dipasang setelah request selesai, interval nyata adalah:
-
-```text
-waktu request + delay polling
-```
-
 ### 13.3 Penambahan grafik
 
 Dashboard menyimpan `lastTimestamp`. Titik hanya ditambahkan jika:
@@ -1163,13 +1196,6 @@ Dashboard menyimpan `lastTimestamp`. Titik hanya ditambahkan jika:
 ```text
 next.timestamp > lastTimestamp
 ```
-
-Artinya:
-
-- Polling 1 detik tidak menggandakan titik lama.
-- Firmware tetap menjadi penghasil sampel baru setiap sekitar 2 detik.
-- Grafik bergerak ketika ThingsBoard menerima timestamp baru.
-- Maksimal 55 titik disimpan di browser.
 
 ### 13.4 Status koneksi
 
@@ -1179,15 +1205,6 @@ Artinya:
 | `LIVE` | API berhasil dan timestamp belum melewati batas stale |
 | `STALE` | ThingsBoard dapat dibaca tetapi ESP32 tidak mengirim data baru |
 | `OFFLINE` | API, login, device, jaringan, atau request bermasalah |
-
-Jika ESP32 dicabut, dashboard dapat tetap terlihat "berjalan" karena:
-
-1. Data terakhir masih tersimpan di ThingsBoard.
-2. Node tetap dapat mengambil data tersebut.
-3. Grafik histori tetap tersedia.
-4. Status baru berubah menjadi `STALE` setelah default 30 detik.
-
-Ini bukan berarti sensor masih mengirim data.
 
 ### 13.5 Grafik
 
@@ -1199,13 +1216,6 @@ Grafik menggunakan empat `YAxis` terpisah:
 | TDS | 0 sampai 5000 |
 | NTU | 0 sampai 1000 |
 | Fuzzy score | 0 sampai 100 |
-
-Hanya sumbu pH yang terlihat, tetapi setiap seri dihitung pada skalanya
-sendiri. Ini mencegah garis pH terlihat datar ketika NTU bernilai ratusan atau
-ribuan.
-
-Animasi Recharts dinonaktifkan untuk setiap area agar pembaruan real-time
-lebih stabil.
 
 ## 14. Jalur Data End-to-End
 
@@ -1225,8 +1235,9 @@ Satu sampel menempuh alur berikut:
 12. ThingsBoard menyimpan latest dan time-series.
 13. Node login sebagai tenant dan membaca data device.
 14. Node menormalisasi key untuk kebutuhan frontend.
-15. React mengambil data latest setiap 1 detik.
-16. Jika timestamp berubah, UI dan grafik diperbarui.
+15. Node auto-save ke **JSON file lokal** dan **Supabase**.
+16. React mengambil data latest setiap 1 detik.
+17. Jika timestamp berubah, UI dan grafik diperbarui.
 
 ## 15. Timing dan Latensi
 
@@ -1239,19 +1250,11 @@ Satu sampel menempuh alur berikut:
 | Polling tab tersembunyi | 10000 ms |
 | Cache latest Node | 500 ms |
 | Cache history Node | 5000 ms |
+| **Save ke JSON file lokal** | **Flush setiap 5000 ms** |
+| **Save ke Supabase** | **Hanya saat timestamp baru (~2000 ms)** |
 | Dedup burst history | 1500 ms |
 | Timeout request browser | 8000 ms |
 | Device dianggap stale | Default 30000 ms |
-
-Ekspektasi normal:
-
-```text
-ESP32 menghasilkan sampel baru sekitar setiap 2 detik.
-Dashboard mengetahui sampel baru sekitar 0 sampai 1+ detik setelah tersedia.
-```
-
-Dashboard mengecek setiap 1 detik, tetapi tidak dapat membuat data sensor baru
-lebih cepat daripada firmware.
 
 ## 16. Mode Development dan Produksi
 
@@ -1283,7 +1286,13 @@ Alurnya:
 Browser :3001 -> Node API + dist frontend -> ThingsBoard
 ```
 
-Satu proses Node melayani frontend dan API.
+### 16.3 Produksi Vercel
+
+Frontend di-deploy ke Vercel sebagai static site. API menggunakan serverless
+functions di folder `api/`. Data history diambil dari **Supabase** (bukan
+ThingsBoard langsung).
+
+Lihat `docs/VERCEL_DEPLOYMENT.md` untuk panduan lengkap.
 
 ## 17. Build dan Upload Firmware
 
@@ -1301,12 +1310,6 @@ platformio run --target upload
 platformio device monitor --port COM3 --baud 115200
 ```
 
-Jika upload gagal karena ESP32 tidak masuk download mode, gunakan tombol
-BOOT dan EN/RESET sesuai panduan pada README.
-
-Perubahan pada file `.ino` baru berlaku di hardware setelah firmware
-di-build dan di-upload ulang.
-
 ## 18. Keamanan
 
 ### 18.1 Credential firmware
@@ -1318,22 +1321,32 @@ Firmware saat ini menyimpan langsung:
 - Host ThingsBoard.
 - Device access token.
 
-Karena file firmware merupakan source code, nilai tersebut berisiko terbaca
-ketika proyek dibagikan.
-
 ### 18.2 Credential backend
 
 Credential tenant disimpan di `.env`, bukan di React. Ini benar secara
 arsitektur karena browser tidak menerima password tenant.
 
-### 18.3 API lokal
+### 18.3 Supabase RLS
 
-Endpoint Node lokal belum memiliki autentikasi. Siapa pun yang dapat
-mengakses port server pada jaringan dapat membaca telemetry. Untuk demo lokal
-ini sederhana, tetapi untuk deployment publik perlu reverse proxy, HTTPS,
-firewall, dan autentikasi.
+Supabase menggunakan **Row Level Security (RLS)** dengan policy:
 
-### 18.4 Rekomendasi dasar
+- `anon_insert`: mengizinkan anon key untuk insert data.
+- `anon_select`: mengizinkan anon key untuk select data.
+- `anon_delete`: mengizinkan anon key untuk delete data (untuk reset).
+
+RLS tetap aktif, sehingga anon key tidak bisa mengakses tabel lain.
+
+### 18.4 Reset data
+
+Endpoint reset menggunakan token rahasia (`RESET_TOKEN` di `.env`).
+Tanpa token yang benar, endpoint akan mengembalikan `403 Forbidden`.
+
+### 18.5 API lokal
+
+Endpoint Node lokal belum memiliki autentikasi. Untuk deployment publik perlu
+reverse proxy, HTTPS, firewall, dan autentikasi.
+
+### 18.6 Rekomendasi dasar
 
 - Jangan commit `.env`.
 - Jangan menampilkan token device pada screenshot.
@@ -1345,21 +1358,21 @@ firewall, dan autentikasi.
 ## 19. Batasan dan Catatan Teknis
 
 1. Komentar firmware masih menyebut 30 rules, tetapi kode memiliki 33 aturan.
-2. Dashboard benar menampilkan 33 rules.
-3. Konfigurasi WiFi dan token masih hardcoded di `.ino`.
-4. Port serial dikunci ke `COM3`.
-5. Tidak ada sensor suhu untuk kompensasi TDS dinamis.
-6. Konversi turbiditas linear dan sangat bergantung pada dua titik kalibrasi.
-7. Rentang kalibrasi turbiditas aktif hanya 0.18 V.
-8. Tidak ada penyaringan median atau outlier selain rata-rata 30 sampel.
-9. Tidak ada penyimpanan lokal ESP32 ketika ThingsBoard tidak dapat diakses.
-10. MQTT fallback hanya mencoba singkat dan tidak membuat antrean retry.
-11. Dashboard memakai polling, bukan WebSocket atau MQTT langsung.
-12. Histori dashboard bergantung pada data yang tersimpan di ThingsBoard.
-13. Server menyimpan JWT dan cache hanya di memori, sehingga hilang saat restart.
-14. Belum ada automated test untuk fuzzy, API, atau komponen React.
-15. Beberapa aset template masih ada tetapi tidak digunakan.
-16. `index.html` masih memakai judul sederhana `aquasense` dan `lang="en"`.
+2. Konfigurasi WiFi dan token masih hardcoded di `.ino`.
+3. Port serial dikunci ke `COM3`.
+4. Tidak ada sensor suhu untuk kompensasi TDS dinamis.
+5. Konversi turbiditas linear dan sangat bergantung pada dua titik kalibrasi.
+6. Rentang kalibrasi turbiditas aktif hanya 0.18 V.
+7. Tidak ada penyaringan median atau outlier selain rata-rata 30 sampel.
+8. Tidak ada penyimpanan lokal ESP32 ketika ThingsBoard tidak dapat diakses.
+9. MQTT fallback hanya mencoba singkat dan tidak membuat antrean retry.
+10. Dashboard memakai polling, bukan WebSocket atau MQTT langsung.
+11. Histori dashboard bergantung pada data yang tersimpan di ThingsBoard.
+12. Server menyimpan JWT dan cache hanya di memori, sehingga hilang saat restart.
+13. Belum ada automated test untuk fuzzy, API, atau komponen React.
+14. **Data di Supabase tidak terhapus otomatis** — perlu reset manual via tombol atau endpoint.
+15. **File JSON lokal hanya untuk backup** — tidak digunakan di Vercel/production.
+16. **Save ke Supabase hanya saat timestamp baru** — menghemat resource dan mencegah duplikat.
 17. Google Fonts memerlukan akses internet saat halaman dimuat.
 
 ## 20. Titik Perubahan Berdasarkan Kebutuhan
@@ -1372,12 +1385,15 @@ firewall, dan autentikasi.
 | Ubah interval kirim ESP32 | `SEND_MS` di file `.ino` |
 | Ubah port ESP32 | `platformio.ini` |
 | Ubah akun/device ThingsBoard | `.env` |
+| Ubah **Supabase config** | `.env` (`SUPABASE_URL`, `SUPABASE_KEY`) |
+| Ubah **token reset** | `.env` (`RESET_TOKEN`) |
 | Ubah interval polling UI | `src/hooks/useTelemetry.js` |
 | Ubah jumlah titik grafik | URL history dan `.slice(-55)` di hook |
 | Ubah warna | `src/utils/theme.js` |
-| Ubah layout utama | `src/components/AquaSense.jsx` |
+| Ubah layout dashboard | `src/components/` (masing-masing komponen) |
 | Ubah bentuk gauge/widget | `src/components/ui/Widgets.jsx` |
-| Ubah cache API | `server/index.js` |
+| Ubah cache API | `server/telemetry-service.js` |
+| Ubah **auto-save interval** | `server/data-service.js` (`SAVE_INTERVAL_MS`) |
 | Ubah proxy development | `vite.config.js` |
 
 ## 21. Cara Memverifikasi Sistem
@@ -1388,16 +1404,7 @@ firewall, dan autentikasi.
 platformio run
 ```
 
-Setelah upload, Serial Monitor seharusnya menunjukkan:
-
-- WiFi berhasil.
-- Nilai raw dan tegangan.
-- Membership pH, TDS, dan NTU.
-- Fuzzy score dan status.
-- HTTP 2xx atau MQTT fallback berhasil.
-- Payload JSON.
-
-### 21.2 API
+### 21.2 API lokal
 
 ```powershell
 Invoke-RestMethod http://localhost:3001/api/health
@@ -1405,20 +1412,38 @@ Invoke-RestMethod http://localhost:3001/api/telemetry/latest
 Invoke-RestMethod "http://localhost:3001/api/telemetry/history?limit=55&hours=6"
 ```
 
-### 21.3 Frontend
+### 21.3 Export
+
+```powershell
+# Download CSV
+Invoke-RestMethod "http://localhost:3001/api/telemetry/export?format=csv" -OutFile export.csv
+
+# Download JSON
+Invoke-RestMethod "http://localhost:3001/api/telemetry/export?format=json" -OutFile export.json
+
+# Filter tanggal
+Invoke-RestMethod "http://localhost:3001/api/telemetry/export?date=2026-07-29&format=csv" -OutFile export.csv
+```
+
+### 21.4 Reset (butuh token)
+
+```powershell
+Invoke-RestMethod "http://localhost:3001/api/telemetry/reset?token=aquasense-reset-2026" -Method POST
+```
+
+### 21.5 Frontend
 
 ```powershell
 npm run lint
 npm run build
 ```
 
-Periksa bahwa:
+### 21.6 Verifikasi Supabase
 
-- Header berubah menjadi `LIVE` ketika telemetry baru masuk.
-- Angka gauge sama dengan endpoint latest.
-- Fuzzy score dan status sama dengan Serial Monitor.
-- Grafik bertambah hanya saat timestamp baru diterima.
-- Setelah ESP32 dicabut, status akhirnya menjadi `STALE`.
+1. Jalankan server: `npm run server:dev`.
+2. Akses endpoint latest: `http://localhost:3001/api/telemetry/latest`.
+3. Cek di Supabase dashboard: **Table Editor** → table `telemetry` → data muncul.
+4. Cek export: `http://localhost:3001/api/telemetry/export?format=csv`.
 
 ## 22. Kesimpulan Arsitektur
 
@@ -1437,7 +1462,7 @@ fuzzy result -> telemetry latest + history
 Node berfungsi sebagai pengaman credential dan adapter data:
 
 ```text
-ThingsBoard REST -> format dashboard
+ThingsBoard REST -> format dashboard + auto-save ke Supabase & JSON file
 ```
 
 React berfungsi sebagai visualisasi:

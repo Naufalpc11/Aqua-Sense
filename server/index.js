@@ -8,12 +8,6 @@ import {
   getLatestTelemetry,
   getTelemetryHistory,
 } from './telemetry-service.js';
-import {
-  getStoredHistory,
-  getAllStoredHistory,
-  flushPending,
-  listDataFiles,
-} from './data-service.js';
 import { getHistoryFromSupabase, resetTelemetryInSupabase } from './supabase-service.js';
 
 function errorMessage(error, fallback) {
@@ -45,24 +39,15 @@ const server = createServer(async (request, response) => {
   }
 
   if (request.method === 'GET' && pathname === '/api/telemetry/export') {
-    // Flush data pending dulu sebelum export
-    flushPending();
     const date = requestUrl.searchParams.get('date') || '';
     const format = requestUrl.searchParams.get('format') || 'json';
 
-    // Coba ambil dari Supabase dulu (online)
+    // Ambil data dari Supabase
     let dataPoints = [];
     try {
       dataPoints = await getHistoryFromSupabase({ date, limit: 50000 });
     } catch {
       // ignore
-    }
-
-    // Fallback ke file JSON lokal jika Supabase belum dikonfigurasi
-    if (!dataPoints.length) {
-      dataPoints = date
-        ? getStoredHistory(date)
-        : getAllStoredHistory();
     }
 
     if (format === 'csv') {
@@ -119,12 +104,6 @@ const server = createServer(async (request, response) => {
     } catch (error) {
       sendJson(response, 503, { success: false, message: errorMessage(error, 'Reset gagal') });
     }
-    return;
-  }
-
-  if (request.method === 'GET' && pathname === '/api/telemetry/files') {
-    const files = listDataFiles();
-    sendJson(response, 200, { files });
     return;
   }
 
