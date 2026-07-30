@@ -67,8 +67,8 @@ export async function getHistoryFromSupabase({ date, limit = 50000 } = {}) {
 
     if (date) {
       // Filter berdasarkan tanggal (timestamp dalam milidetik)
-      const startOfDay = new Date(date + 'T00:00:00+07:00').getTime();
-      const endOfDay = new Date(date + 'T23:59:59+07:00').getTime();
+      const startOfDay = new Date(date + 'T00:00:00+08:00').getTime();
+      const endOfDay = new Date(date + 'T23:59:59+08:00').getTime();
       query = query.gte('timestamp', startOfDay).lte('timestamp', endOfDay);
     }
 
@@ -122,15 +122,15 @@ export async function resetTelemetryInSupabase() {
   }
 }
 
-function toWIB(ts) {
+function toWITA(ts) {
   const d = new Date(ts);
-  const offset = 7 * 60 * 60 * 1000; // WIB = UTC+7 dalam milidetik
+  const offset = 8 * 60 * 60 * 1000; // WITA = UTC+8 dalam milidetik
   return new Date(d.getTime() + offset);
 }
 
 function formatTimestamp(ts) {
   if (!ts) return '';
-  const d = toWIB(ts);
+  const d = toWITA(ts);
   const y = d.getUTCFullYear();
   const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
   const day = String(d.getUTCDate()).padStart(2, '0');
@@ -142,7 +142,7 @@ function formatTimestamp(ts) {
 
 function formatISO(iso) {
   if (!iso) return '';
-  const d = toWIB(iso);
+  const d = toWITA(iso);
   const y = d.getUTCFullYear();
   const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
   const day = String(d.getUTCDate()).padStart(2, '0');
