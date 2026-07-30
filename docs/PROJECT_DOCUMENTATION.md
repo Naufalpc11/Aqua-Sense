@@ -40,26 +40,23 @@ Node.js API bridge
   |
   ├── /api/telemetry/latest dan /api/telemetry/history
   ├── /api/telemetry/export   (CSV/JSON download)
-  ├── /api/telemetry/reset    (hapus data Supabase)
-  └── /api/telemetry/files    (daftar file JSON lokal)
+  └── /api/telemetry/reset    (hapus data Supabase)
   |
   v
 React dashboard
 ```
 
-### Dual Storage (Supabase + JSON Lokal)
+### Supabase Cloud Storage
 
-Setiap data telemetry yang diambil dari ThingsBoard disimpan ke **dua tempat**:
+Setiap data telemetry yang diambil dari ThingsBoard disimpan ke **Supabase**:
 
 ```
-Node API
-   |
-   ├── JSON file (lokal) → folder data/telemetry-YYYY-MM-DD.json
-   └── Supabase (cloud)  → table telemetry (untuk Vercel/production)
+Node API → Supabase (cloud) → table telemetry
 ```
 
-- **JSON file**: backup lokal, tetap jalan walau tanpa Supabase.
-- **Supabase**: untuk export CSV/JSON di Vercel / production.
+- **Supabase**: database online untuk export CSV/JSON di Vercel / production.
+- Data hanya disimpan saat timestamp berubah (mencegah duplikat).
+- Timezone menggunakan WITA (UTC+8).
 
 ## 2. Tujuan Setiap Lapisan
 
@@ -68,7 +65,7 @@ Node API
 | Sensor | Menghasilkan sinyal analog pH, TDS, dan turbiditas |
 | ESP32 | Sampling ADC, kalibrasi, fuzzy, serial debug, pengiriman telemetry |
 | ThingsBoard | Menyimpan latest telemetry dan histori time-series |
-| Node API | Login tenant, mengambil telemetry, normalisasi data, cache, static hosting, auto-save ke Supabase & JSON file |
+| Node API | Login tenant, mengambil telemetry, normalisasi data, cache, static hosting, auto-save ke Supabase |
 | React | Menampilkan status, gauge, grafik, visualisasi air, dan log |
 
 Pemisahan ini penting karena:
@@ -126,8 +123,6 @@ aquasense/
 |-- .env
 |-- .env.example
 |-- .gitignore
-|-- data/
-|   `-- telemetry-2026-07-29.json     (auto-generated, di-gitignore)
 |-- docs/
 |   |-- PROJECT_DOCUMENTATION.md
 |   |-- THINGSBOARD_SETUP.md
@@ -147,7 +142,6 @@ aquasense/
 |       `-- reset.js
 |-- server/
 |   |-- config.js
-|   |-- data-service.js               (JSON file storage)
 |   |-- http-utils.js
 |   |-- index.js
 |   |-- supabase-service.js           (Supabase cloud storage)
@@ -190,7 +184,6 @@ aquasense/
 | `api/` | Serverless functions untuk deployment Vercel |
 | `public/` | File statis yang disalin Vite tanpa pemrosesan |
 | `docs/` | Dokumentasi proyek dan panduan |
-| `data/` | File JSON telemetry lokal (di-gitignore) |
 
 ### 4.2 Folder hasil generate
 
@@ -262,7 +255,6 @@ Endpoint yang tersedia:
 | `GET` | `/api/telemetry/history` | Mengambil histori time-series |
 | `GET` | `/api/telemetry/export` | Download data sebagai CSV/JSON |
 | `POST` | `/api/telemetry/reset` | Hapus semua data di Supabase (protected token) |
-| `GET` | `/api/telemetry/files` | Daftar file JSON lokal yang tersedia |
 
 #### `server/config.js`
 
@@ -289,17 +281,7 @@ Menangani logika data telemetry:
 - Pengambilan dan penggabungan histori.
 - Dedup burst telemetry.
 - Cache latest 500 ms dan history 5 detik.
-- Auto-save ke JSON file lokal dan Supabase (hanya saat timestamp baru).
-
-#### `server/data-service.js`
-
-Menyimpan data telemetry ke file JSON lokal:
-
-- Buffer data di memory, flush ke disk setiap 5 detik.
-- Rotasi file per hari (`telemetry-YYYY-MM-DD.json`).
-- Maksimal 50.000 titik per file.
-- Menyediakan fungsi untuk membaca dan menggabungkan data dari file.
-- Format timestamp menggunakan WIB (UTC+7).
+- Auto-save ke Supabase (hanya saat timestamp baru).
 
 #### `server/supabase-service.js`
 
@@ -309,7 +291,7 @@ Menghubungkan ke Supabase untuk cloud storage:
 - `saveTelemetryToSupabase(point)` — insert data ke tabel `telemetry`.
 - `getHistoryFromSupabase({ date, limit })` — baca data historis.
 - `resetTelemetryInSupabase()` — hapus semua data (dipanggil dari endpoint reset).
-- Format timestamp menggunakan WIB (UTC+7).
+- Format timestamp menggunakan WITA (UTC+8).
 
 #### `server/http-utils.js`
 
@@ -566,7 +548,6 @@ Mengabaikan file hasil generate dan rahasia seperti:
 - `dist`
 - `.env`
 - `.pio`
-- `data/` (folder data telemetry lokal)
 - log
 - sebagian konfigurasi editor
 
@@ -1019,8 +1000,7 @@ Server:
 4. Mengubah label firmware menjadi label UI.
 5. Menghitung apakah device masih online.
 6. Menyimpan hasil dalam cache selama 500 ms.
-7. **Auto-save ke JSON file lokal** (via `data-service.js`).
-8. **Auto-save ke Supabase** (hanya jika timestamp berbeda dari sebelumnya).
+7. **Auto-save ke Supabase** (hanya jika timestamp berbeda dari sebelumnya).
 
 Penentuan online:
 
@@ -1070,10 +1050,8 @@ Endpoint: `GET /api/telemetry/export?format=csv&date=2026-07-29`
 
 Alur:
 
-1. Flush data pending di buffer JSON file.
-2. Coba ambil data dari **Supabase** terlebih dahulu.
-3. Jika Supabase belum dikonfigurasi atau kosong, fallback ke **file JSON lokal**.
-4. Format CSV menggunakan WIB (UTC+7) dengan BOM UTF-8 agar kompatibel Excel.
+1. Ambil data dari **Supabase**.
+2. Format CSV menggunakan WITA (UTC+8) dengan BOM UTF-8 agar kompatibel Excel.
 
 Kolom CSV:
 
@@ -1235,7 +1213,7 @@ Satu sampel menempuh alur berikut:
 12. ThingsBoard menyimpan latest dan time-series.
 13. Node login sebagai tenant dan membaca data device.
 14. Node menormalisasi key untuk kebutuhan frontend.
-15. Node auto-save ke **JSON file lokal** dan **Supabase**.
+15. Node auto-save ke **Supabase**.
 16. React mengambil data latest setiap 1 detik.
 17. Jika timestamp berubah, UI dan grafik diperbarui.
 
@@ -1250,7 +1228,6 @@ Satu sampel menempuh alur berikut:
 | Polling tab tersembunyi | 10000 ms |
 | Cache latest Node | 500 ms |
 | Cache history Node | 5000 ms |
-| **Save ke JSON file lokal** | **Flush setiap 5000 ms** |
 | **Save ke Supabase** | **Hanya saat timestamp baru (~2000 ms)** |
 | Dedup burst history | 1500 ms |
 | Timeout request browser | 8000 ms |
@@ -1371,8 +1348,8 @@ reverse proxy, HTTPS, firewall, dan autentikasi.
 12. Server menyimpan JWT dan cache hanya di memori, sehingga hilang saat restart.
 13. Belum ada automated test untuk fuzzy, API, atau komponen React.
 14. **Data di Supabase tidak terhapus otomatis** — perlu reset manual via tombol atau endpoint.
-15. **File JSON lokal hanya untuk backup** — tidak digunakan di Vercel/production.
-16. **Save ke Supabase hanya saat timestamp baru** — menghemat resource dan mencegah duplikat.
+15. **Save ke Supabase hanya saat timestamp baru** — menghemat resource dan mencegah duplikat.
+16. **Timezone WITA (UTC+8)** — format timestamp di export CSV menggunakan WITA.
 17. Google Fonts memerlukan akses internet saat halaman dimuat.
 
 ## 20. Titik Perubahan Berdasarkan Kebutuhan
@@ -1393,7 +1370,7 @@ reverse proxy, HTTPS, firewall, dan autentikasi.
 | Ubah layout dashboard | `src/components/` (masing-masing komponen) |
 | Ubah bentuk gauge/widget | `src/components/ui/Widgets.jsx` |
 | Ubah cache API | `server/telemetry-service.js` |
-| Ubah **auto-save interval** | `server/data-service.js` (`SAVE_INTERVAL_MS`) |
+| Ubah **timezone export** | `server/supabase-service.js` (`toWITA` function) |
 | Ubah proxy development | `vite.config.js` |
 
 ## 21. Cara Memverifikasi Sistem
@@ -1462,7 +1439,7 @@ fuzzy result -> telemetry latest + history
 Node berfungsi sebagai pengaman credential dan adapter data:
 
 ```text
-ThingsBoard REST -> format dashboard + auto-save ke Supabase & JSON file
+ThingsBoard REST -> format dashboard + auto-save ke Supabase
 ```
 
 React berfungsi sebagai visualisasi:

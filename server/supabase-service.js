@@ -9,7 +9,7 @@ function getClient() {
     const url = process.env.SUPABASE_URL || '';
     const key = process.env.SUPABASE_KEY || '';
     if (!url || !key) {
-      console.warn('⚠️  Supabase belum dikonfigurasi. Data hanya disimpan di file lokal.');
+      console.warn('Supabase belum dikonfigurasi.');
       return null;
     }
     supabase = createClient(url, key);
@@ -43,10 +43,10 @@ export async function saveTelemetryToSupabase(point) {
     });
 
     if (error) {
-      console.error('❌ Gagal simpan ke Supabase:', error.message);
+      console.error('Gagal simpan ke Supabase:', error.message);
     }
   } catch (err) {
-    console.error('❌ Error koneksi Supabase:', err.message);
+    console.error('Error koneksi Supabase:', err.message);
   }
 }
 
