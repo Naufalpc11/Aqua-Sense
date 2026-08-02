@@ -116,7 +116,7 @@ export function useTelemetry() {
           state: payload.deviceOnline ? 'live' : 'stale',
           message: payload.deviceOnline
             ? 'Telemetry ESP32 aktif'
-            : `Data terakhir ${new Date(next.timestamp).toLocaleString('id-ID')}`,
+            : `ESP32 tidak mengirim data baru. Periksa koneksi WiFi atau HTTP/MQTT gagal. Data terakhir: ${new Date(next.timestamp).toLocaleString('id-ID')}`,
         });
 
         if (next.timestamp > lastTimestamp.current) {
@@ -147,8 +147,8 @@ export function useTelemetry() {
         setConnection({
           state: 'offline',
           message: error.name === 'AbortError'
-            ? 'Request telemetry timeout'
-            : error.message || 'Telemetry tidak tersedia',
+            ? 'Request timeout - server tidak merespons. Periksa koneksi Node API atau ThingsBoard.'
+            : error.message || 'Gagal terhubung ke server. Periksa koneksi ThingsBoard atau Node API.',
         });
       } finally {
         pollInFlight = false;

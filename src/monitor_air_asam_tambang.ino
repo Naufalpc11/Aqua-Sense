@@ -254,7 +254,7 @@ float mf_NTU_SK(float x) { return mfTrap(x, 300.0f, 600.0f,3000.0f,3000.0f); }
 // ================================================================
 //  MESIN INFERENSI FUZZY (Mamdani + Weighted Average)
 //
-//  30 RULES – Divalidasi dengan 3 sampel nyata:
+//  33 RULES – Divalidasi dengan 3 sampel nyata:
 //  ┌──────────────┬───────┬──────────┬──────┬──────────────────┐
 //  │ Sampel       │  pH   │ TDS(ppm) │ NTU  │ Output           │
 //  ├──────────────┼───────┼──────────┼──────┼──────────────────┤
